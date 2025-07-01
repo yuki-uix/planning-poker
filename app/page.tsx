@@ -27,6 +27,9 @@ import {
   Wifi,
   WifiOff,
   Settings,
+  Share2,
+  Copy,
+  Check,
 } from "lucide-react";
 import {
   joinSession,
@@ -84,6 +87,7 @@ export default function PointEstimationTool() {
   const [isJoined, setIsJoined] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // 估点模板相关状态
   const [selectedTemplate, setSelectedTemplate] =
@@ -103,6 +107,38 @@ export default function PointEstimationTool() {
   };
 
   const currentEstimationCards = getCurrentEstimationCards();
+
+  // 从URL参数读取session ID
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionFromUrl = urlParams.get('session');
+    if (sessionFromUrl && !sessionId) {
+      setSessionId(sessionFromUrl);
+    }
+  }, [sessionId]);
+
+  // 更新URL以包含session ID
+  useEffect(() => {
+    if (sessionId && isJoined) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('session', sessionId);
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [sessionId, isJoined]);
+
+  // 复制分享链接
+  const copyShareLink = async () => {
+    const shareUrl = new URL(window.location.href);
+    shareUrl.searchParams.set('session', sessionId);
+    
+    try {
+      await navigator.clipboard.writeText(shareUrl.toString());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy link:', error);
+    }
+  };
 
   // Poll for session updates
   const pollSession = useCallback(async () => {
@@ -326,6 +362,19 @@ export default function PointEstimationTool() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyShareLink}
+                  className="flex items-center gap-2"
+                >
+                  {copied ? (
+                    <Check className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <Share2 className="w-4 h-4" />
+                  )}
+                  {copied ? t.main.copied : t.main.share}
+                </Button>
                 <LanguageSwitcher />
                 <div className="flex items-center gap-2">
                   {isConnected ? (

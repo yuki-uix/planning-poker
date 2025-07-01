@@ -34,6 +34,8 @@ export interface Translations {
     disconnected: string;
     users: string;
     you: string;
+    share: string;
+    copied: string;
   };
 
   // 模板设置
@@ -116,6 +118,8 @@ const translations: Record<Language, Translations> = {
       disconnected: "已断开",
       users: "用户",
       you: "你",
+      share: "分享",
+      copied: "已复制",
     },
     templates: {
       title: "估点模板设置",
@@ -186,6 +190,8 @@ const translations: Record<Language, Translations> = {
       disconnected: "Disconnected",
       users: "users",
       you: "You",
+      share: "Share",
+      copied: "Copied",
     },
     templates: {
       title: "Estimation Template Settings",
