@@ -28,7 +28,6 @@ import {
   WifiOff,
   Settings,
   Share2,
-  Copy,
   Check,
 } from "lucide-react";
 import {
@@ -135,8 +134,8 @@ export default function PointEstimationTool() {
       await navigator.clipboard.writeText(shareUrl.toString());
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error('Failed to copy link:', error);
+    } catch {
+      console.error('Failed to copy link');
     }
   };
 
@@ -158,7 +157,7 @@ export default function PointEstimationTool() {
           setSelectedVote(currentUserData.vote);
         }
       }
-    } catch (error) {
+    } catch {
       setIsConnected(false);
     }
   }, [isJoined, sessionId, currentUser]);
@@ -169,8 +168,8 @@ export default function PointEstimationTool() {
 
     try {
       await heartbeat(sessionId, currentUser);
-    } catch (error) {
-      console.error("Heartbeat failed:", error);
+    } catch {
+      console.error("Heartbeat failed");
     }
   }, [isJoined, sessionId, currentUser]);
 
@@ -207,8 +206,8 @@ export default function PointEstimationTool() {
         setIsJoined(true);
         setIsConnected(true);
       }
-    } catch (error) {
-      console.error("Failed to join session:", error);
+    } catch {
+      console.error("Failed to join session");
       setIsConnected(false);
     } finally {
       setIsLoading(false);
@@ -225,8 +224,8 @@ export default function PointEstimationTool() {
       if (result.success && result.session) {
         setSession(result.session);
       }
-    } catch (error) {
-      console.error("Failed to cast vote:", error);
+    } catch {
+      console.error("Failed to cast vote");
     }
   };
 
@@ -238,8 +237,8 @@ export default function PointEstimationTool() {
       if (result.success && result.session) {
         setSession(result.session);
       }
-    } catch (error) {
-      console.error("Failed to reveal votes:", error);
+    } catch {
+      console.error("Failed to reveal votes");
     }
   };
 
@@ -252,8 +251,8 @@ export default function PointEstimationTool() {
         setSession(result.session);
         setSelectedVote(null);
       }
-    } catch (error) {
-      console.error("Failed to reset votes:", error);
+    } catch {
+      console.error("Failed to reset votes");
     }
   };
 

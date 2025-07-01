@@ -256,11 +256,11 @@ export function getTranslation(lang: Language): Translations {
 // 获取嵌套翻译
 export function getNestedTranslation(lang: Language, path: string): string {
   const keys = path.split(".");
-  let value: any = translations[lang];
+  let value: unknown = translations[lang];
 
   for (const key of keys) {
     if (value && typeof value === "object" && key in value) {
-      value = value[key];
+      value = (value as Record<string, unknown>)[key];
     } else {
       return path; // 如果找不到翻译，返回原路径
     }
