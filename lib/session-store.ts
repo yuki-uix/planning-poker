@@ -259,23 +259,40 @@ export function canVote(sessionId: string, userId: string): boolean {
   return user?.role === "attendance" || user?.role === "host";
 }
 
-// 本地存储相关的工具函数
+// 改进的本地存储相关的工具函数
 interface StoredUserInfo {
   userId: string;
   userName: string;
   sessionId: string;
   role: UserRole;
   timestamp: number;
+  lastVote?: string | null;
+  lastSessionState?: {
+    revealed: boolean;
+    template: {
+      type: string;
+      customCards?: string;
+    };
+  };
 }
 
 const STORAGE_KEY = "estimation_tool_user_info";
+const SESSION_STORAGE_KEY = "estimation_tool_session_state";
 const STORAGE_EXPIRY = 24 * 60 * 60 * 1000; // 24小时过期
 
 export function saveUserInfoToStorage(
   userId: string,
   userName: string,
   sessionId: string,
-  role: UserRole
+  role: UserRole,
+  lastVote?: string | null,
+  sessionState?: {
+    revealed: boolean;
+    template: {
+      type: string;
+      customCards?: string;
+    };
+  }
 ): void {
   if (typeof window === "undefined") return;
 
@@ -285,10 +302,24 @@ export function saveUserInfoToStorage(
     sessionId,
     role,
     timestamp: Date.now(),
+    lastVote,
+    lastSessionState: sessionState,
   };
 
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(userInfo));
+
+    // 同时保存会话状态
+    if (sessionState) {
+      localStorage.setItem(
+        SESSION_STORAGE_KEY,
+        JSON.stringify({
+          sessionId,
+          state: sessionState,
+          timestamp: Date.now(),
+        })
+      );
+    }
   } catch (error) {
     console.error("Failed to save user info to localStorage:", error);
   }
@@ -306,6 +337,7 @@ export function getUserInfoFromStorage(): StoredUserInfo | null {
     // 检查是否过期
     if (Date.now() - userInfo.timestamp > STORAGE_EXPIRY) {
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(SESSION_STORAGE_KEY);
       return null;
     }
 
@@ -316,12 +348,106 @@ export function getUserInfoFromStorage(): StoredUserInfo | null {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getSessionStateFromStorage(sessionId: string): any {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const stored = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!stored) return null;
+
+    const sessionData = JSON.parse(stored);
+
+    // 检查是否过期或sessionId不匹配
+    if (
+      Date.now() - sessionData.timestamp > STORAGE_EXPIRY ||
+      sessionData.sessionId !== sessionId
+    ) {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      return null;
+    }
+
+    return sessionData.state;
+  } catch (error) {
+    console.error("Failed to get session state from localStorage:", error);
+    return null;
+  }
+}
+
 export function clearUserInfoFromStorage(): void {
   if (typeof window === "undefined") return;
 
   try {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(SESSION_STORAGE_KEY);
   } catch (error) {
     console.error("Failed to clear user info from localStorage:", error);
+  }
+}
+
+// 新增：验证用户信息是否有效
+export function validateStoredUserInfo(userInfo: StoredUserInfo): boolean {
+  if (!userInfo.userId || !userInfo.userName || !userInfo.sessionId) {
+    return false;
+  }
+
+  // 检查时间戳是否有效
+  if (Date.now() - userInfo.timestamp > STORAGE_EXPIRY) {
+    return false;
+  }
+
+  return true;
+}
+
+// 新增：更新用户投票信息
+export function updateStoredUserVote(vote: string | null): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return;
+
+    const userInfo: StoredUserInfo = JSON.parse(stored);
+    userInfo.lastVote = vote;
+    userInfo.timestamp = Date.now(); // 更新时间戳
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(userInfo));
+  } catch (error) {
+    console.error("Failed to update stored user vote:", error);
+  }
+}
+
+// 新增：更新会话状态
+export function updateStoredSessionState(
+  sessionId: string,
+  sessionState: {
+    revealed: boolean;
+    template: {
+      type: string;
+      customCards?: string;
+    };
+  }
+): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return;
+
+    const userInfo: StoredUserInfo = JSON.parse(stored);
+    userInfo.lastSessionState = sessionState;
+    userInfo.timestamp = Date.now();
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(userInfo));
+    localStorage.setItem(
+      SESSION_STORAGE_KEY,
+      JSON.stringify({
+        sessionId,
+        state: sessionState,
+        timestamp: Date.now(),
+      })
+    );
+  } catch (error) {
+    console.error("Failed to update stored session state:", error);
   }
 }

@@ -82,7 +82,7 @@ export function ResultsDisplay({ session, stats }: ResultsDisplayProps) {
           </CardContent>
         </Card>
       </div>
-      <div className="w-1/3">
+      <div className="w-1/4">
         <div className="flex flex-col text-center bg-white p-4 rounded-lg items-center justify-center h-full">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Calculator className="w-5 h-5" />
