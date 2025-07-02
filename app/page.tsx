@@ -142,7 +142,7 @@ export default function PointEstimationTool() {
     };
 
     restoreUserState();
-  }, [sessionId, currentUser, userName, selectedRole]);
+  }, []); // 只在组件挂载时执行一次
 
   // 轮询会话数据
   const pollSession = useCallback(async () => {
