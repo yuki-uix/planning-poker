@@ -44,6 +44,7 @@ export interface Translations {
     you: string;
     share: string;
     copied: string;
+    logout: string;
     role: string;
     host: string;
     attendance: string;
@@ -143,6 +144,7 @@ const translations: Record<Language, Translations> = {
       you: "你",
       share: "分享",
       copied: "已复制",
+      logout: "退出",
       role: "角色",
       host: "主持人",
       attendance: "参与者",
@@ -231,6 +233,7 @@ const translations: Record<Language, Translations> = {
       you: "You",
       share: "Share",
       copied: "Copied",
+      logout: "Logout",
       role: "Role",
       host: "Host",
       attendance: "Attendance",

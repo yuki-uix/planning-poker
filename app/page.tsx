@@ -8,7 +8,12 @@ import { TemplateSettings } from "@/components/template-settings";
 import { UserStatus } from "@/components/user-status";
 import { VotingCards } from "@/components/voting-cards";
 import { calculateStats, checkAllUsersVoted } from "@/lib/estimation-utils";
-import { UserRole } from "@/lib/session-store";
+import {
+  UserRole,
+  saveUserInfoToStorage,
+  getUserInfoFromStorage,
+  clearUserInfoFromStorage,
+} from "@/lib/session-store";
 import { Session, TemplateType } from "@/types/estimation";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -40,19 +45,58 @@ export default function PointEstimationTool() {
   const canVote =
     currentUserData?.role === "attendance" || currentUserData?.role === "host";
 
-  // 从URL参数读取session ID
+  // 页面加载时恢复用户状态
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionFromUrl = urlParams.get("session");
-    if (sessionFromUrl && !sessionId) {
-      setSessionId(sessionFromUrl);
-      // 如果从URL获取到sessionId，说明是受邀加入，只能选择attendance或guest
-      setSelectedRole("attendance");
-    } else if (!sessionFromUrl) {
-      // 如果没有sessionId参数，说明是初始用户，默认为host
-      setSelectedRole("host");
-    }
-  }, [sessionId]);
+    const restoreUserState = async () => {
+      // 首先尝试从本地存储恢复用户信息
+      const storedUserInfo = getUserInfoFromStorage();
+
+      if (storedUserInfo) {
+        // 如果有存储的用户信息，尝试恢复会话
+        setCurrentUser(storedUserInfo.userId);
+        setUserName(storedUserInfo.userName);
+        setSessionId(storedUserInfo.sessionId);
+        setSelectedRole(storedUserInfo.role);
+
+        // 尝试获取会话数据
+        try {
+          const result = await getSessionData(storedUserInfo.sessionId);
+          if (result.success && result.session) {
+            // 检查用户是否还在会话中
+            const userExists = result.session.users.find(
+              (u) => u.id === storedUserInfo.userId
+            );
+            if (userExists) {
+              setSession(result.session);
+              setIsJoined(true);
+              setIsConnected(true);
+              setSelectedVote(userExists.vote);
+              return; // 成功恢复，不需要进一步处理
+            }
+          }
+        } catch (error) {
+          console.log("Failed to restore session, will show login form", error);
+        }
+
+        // 如果恢复失败，清除存储的信息
+        clearUserInfoFromStorage();
+      }
+
+      // 如果没有存储信息或恢复失败，从URL参数读取session ID
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionFromUrl = urlParams.get("session");
+      if (sessionFromUrl && !sessionId) {
+        setSessionId(sessionFromUrl);
+        // 如果从URL获取到sessionId，说明是受邀加入，只能选择attendance或guest
+        setSelectedRole("attendance");
+      } else if (!sessionFromUrl) {
+        // 如果没有sessionId参数，说明是初始用户，默认为host
+        setSelectedRole("host");
+      }
+    };
+
+    restoreUserState();
+  }, [sessionId, currentUser, userName]);
 
   // 更新URL以包含session ID
   useEffect(() => {
@@ -144,6 +188,9 @@ export default function PointEstimationTool() {
         setSessionId(result.sessionId);
         setIsJoined(true);
         setIsConnected(true);
+
+        // 保存用户信息到本地存储
+        saveUserInfoToStorage(userId, userName, result.sessionId, "host");
       }
     } catch {
       console.error("Failed to create session");
@@ -171,6 +218,9 @@ export default function PointEstimationTool() {
         setSession(result.session);
         setIsJoined(true);
         setIsConnected(true);
+
+        // 保存用户信息到本地存储
+        saveUserInfoToStorage(userId, userName, sessionId, selectedRole);
       }
     } catch {
       console.error("Failed to join session");
@@ -253,6 +303,28 @@ export default function PointEstimationTool() {
     }
   };
 
+  const handleLogout = () => {
+    // 清除本地存储的用户信息
+    clearUserInfoFromStorage();
+
+    // 重置所有状态
+    setCurrentUser("");
+    setUserName("");
+    setSessionId("");
+    setSelectedRole("host");
+    setSession(null);
+    setSelectedVote(null);
+    setIsJoined(false);
+    setIsConnected(true);
+    setIsLoading(false);
+    setCopied(false);
+
+    // 清除URL参数
+    const url = new URL(window.location.href);
+    url.searchParams.delete("session");
+    window.history.replaceState({}, "", url.toString());
+  };
+
   // 计算统计数据
   const stats = session ? calculateStats(session) : null;
   const allUsersVoted = session ? checkAllUsersVoted(session) : false;
@@ -285,6 +357,7 @@ export default function PointEstimationTool() {
           isConnected={isConnected}
           copied={copied}
           onCopyShareLink={copyShareLink}
+          onLogout={handleLogout}
         />
 
         <TemplateSettings

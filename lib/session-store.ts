@@ -258,3 +258,70 @@ export function canVote(sessionId: string, userId: string): boolean {
   const user = session?.users.find((u) => u.id === userId);
   return user?.role === "attendance" || user?.role === "host";
 }
+
+// 本地存储相关的工具函数
+interface StoredUserInfo {
+  userId: string;
+  userName: string;
+  sessionId: string;
+  role: UserRole;
+  timestamp: number;
+}
+
+const STORAGE_KEY = "estimation_tool_user_info";
+const STORAGE_EXPIRY = 24 * 60 * 60 * 1000; // 24小时过期
+
+export function saveUserInfoToStorage(
+  userId: string,
+  userName: string,
+  sessionId: string,
+  role: UserRole
+): void {
+  if (typeof window === "undefined") return;
+
+  const userInfo: StoredUserInfo = {
+    userId,
+    userName,
+    sessionId,
+    role,
+    timestamp: Date.now(),
+  };
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(userInfo));
+  } catch (error) {
+    console.error("Failed to save user info to localStorage:", error);
+  }
+}
+
+export function getUserInfoFromStorage(): StoredUserInfo | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return null;
+
+    const userInfo: StoredUserInfo = JSON.parse(stored);
+
+    // 检查是否过期
+    if (Date.now() - userInfo.timestamp > STORAGE_EXPIRY) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+
+    return userInfo;
+  } catch (error) {
+    console.error("Failed to get user info from localStorage:", error);
+    return null;
+  }
+}
+
+export function clearUserInfoFromStorage(): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (error) {
+    console.error("Failed to clear user info from localStorage:", error);
+  }
+}
