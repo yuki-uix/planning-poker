@@ -9,6 +9,7 @@ import {
   resetSessionVotes,
   updateUserHeartbeat,
   updateSessionTemplate,
+  transferHostRole,
   UserRole,
 } from "@/lib/session-store";
 import { v4 as uuidv4 } from "uuid";
@@ -137,5 +138,17 @@ export async function updateTemplate(
     return { success: true, session };
   } catch {
     return { success: false, error: "Failed to update template" };
+  }
+}
+
+export async function transferHost(
+  sessionId: string,
+  currentHostId: string
+) {
+  try {
+    const session = transferHostRole(sessionId, currentHostId);
+    return { success: true, session };
+  } catch {
+    return { success: false, error: "Failed to transfer host role" };
   }
 }

@@ -246,6 +246,50 @@ export function updateSessionTemplate(
   return updatedSession;
 }
 
+// 新增：转移host权限给第一个attendance用户
+export function transferHostRole(
+  sessionId: string,
+  currentHostId: string
+): Session | null {
+  const session = getSession(sessionId);
+  if (!session) return null;
+
+  // 只有当前host可以转移权限
+  if (session.hostId !== currentHostId) {
+    return session;
+  }
+
+  // 找到第一个attendance用户
+  const firstAttendance = session.users.find(
+    (user) => user.role === "attendance" && user.id !== currentHostId
+  );
+
+  if (!firstAttendance) {
+    // 如果没有其他attendance用户，删除session
+    sessions.delete(sessionId);
+    return null;
+  }
+
+  // 更新hostId和用户角色
+  const updatedUsers = session.users.map((user) => {
+    if (user.id === firstAttendance.id) {
+      return { ...user, role: "host" as UserRole };
+    } else if (user.id === currentHostId) {
+      return { ...user, role: "attendance" as UserRole };
+    }
+    return user;
+  });
+
+  const updatedSession = {
+    ...session,
+    users: updatedUsers,
+    hostId: firstAttendance.id,
+  };
+
+  sessions.set(sessionId, updatedSession);
+  return updatedSession;
+}
+
 // 检查用户是否为host
 export function isHost(sessionId: string, userId: string): boolean {
   const session = getSession(sessionId);

@@ -28,6 +28,7 @@ import {
   resetVotes,
   revealVotes,
   updateTemplate,
+  transferHost,
 } from "./actions";
 
 export default function PointEstimationTool() {
@@ -125,10 +126,20 @@ export default function PointEstimationTool() {
         // 如果没有存储信息或恢复失败，从URL参数读取session ID
         const urlParams = new URLSearchParams(window.location.search);
         const sessionFromUrl = urlParams.get("session");
-        if (sessionFromUrl && !sessionId) {
+        
+        // 检查URL中的sessionId是否与存储的不同
+        if (sessionFromUrl && (!storedUserData || storedUserData.sessionId !== sessionFromUrl)) {
+          // 如果URL中有不同的sessionId，说明是受邀加入新会话
           setSessionId(sessionFromUrl);
-          // 如果从URL获取到sessionId，说明是受邀加入，只能选择attendance或guest
           setSelectedRole("attendance");
+          // 清除之前的用户信息，因为要加入新会话
+          if (storedUserData) {
+            clearAllData();
+          }
+        } else if (sessionFromUrl && storedUserData && storedUserData.sessionId === sessionFromUrl) {
+          // URL中的sessionId与存储的相同，继续使用存储的信息
+          setSessionId(sessionFromUrl);
+          setSelectedRole(storedUserData.role);
         } else if (!sessionFromUrl) {
           // 如果没有sessionId参数，说明是初始用户，默认为host
           setSelectedRole("host");
@@ -169,13 +180,19 @@ export default function PointEstimationTool() {
           await updateUserVote(currentUserInSession.vote);
         }
       } else {
+        // session不存在，可能是被删除了
         setIsConnected(false);
+        // 如果session不存在，自动logout
+        if (isJoined) {
+          console.log("Session not found, auto logout");
+          performLogout();
+        }
       }
     } catch (error) {
       console.error("Failed to poll session:", error);
       setIsConnected(false);
     }
-  }, [sessionId, currentUser]);
+  }, [sessionId, currentUser, isJoined]);
 
   // 发送心跳
   const sendHeartbeat = useCallback(async () => {
@@ -411,7 +428,7 @@ export default function PointEstimationTool() {
     }
   };
 
-  const handleLogout = () => {
+  const performLogout = () => {
     // 清除持久化存储的用户信息
     clearAllData();
 
@@ -431,6 +448,26 @@ export default function PointEstimationTool() {
     const url = new URL(window.location.href);
     url.searchParams.delete("session");
     window.history.replaceState({}, "", url.toString());
+  };
+
+  const handleLogout = async () => {
+    // 如果是host，先尝试转移权限
+    if (isHost && sessionId && currentUser) {
+      try {
+        const result = await transferHost(sessionId, currentUser);
+        if (result.success && result.session) {
+          // 权限转移成功，其他用户会通过轮询自动更新状态
+          console.log("Host role transferred successfully");
+        } else if (!result.session) {
+          // session被删除，其他用户会在下次轮询时发现并自动logout
+          console.log("Session deleted, all users will be logged out");
+        }
+      } catch (error) {
+        console.error("Failed to transfer host role:", error);
+      }
+    }
+
+    performLogout();
   };
 
   // 计算统计数据
