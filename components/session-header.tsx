@@ -7,7 +7,7 @@ import {
   Card,
   CardDescription,
   CardHeader,
-  CardTitle
+  CardTitle,
 } from "@/components/ui/card";
 import { useLanguage } from "@/hooks/use-language";
 import { Session } from "@/types/estimation";
@@ -15,6 +15,7 @@ import {
   Check,
   Crown,
   EyeOff,
+  LogOut,
   Share2,
   User,
   Users,
@@ -30,6 +31,7 @@ interface SessionHeaderProps {
   isConnected: boolean;
   copied: boolean;
   onCopyShareLink: () => void;
+  onLogout: () => void;
 }
 
 export function SessionHeader({
@@ -40,6 +42,7 @@ export function SessionHeader({
   isConnected,
   copied,
   onCopyShareLink,
+  onLogout,
 }: SessionHeaderProps) {
   const { t } = useLanguage();
   const currentUserData = session.users.find((u) => u.id === currentUser);
@@ -83,6 +86,15 @@ export function SessionHeader({
               {copied ? t.main.copied : t.main.share}
             </Button>
             <LanguageSwitcher />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onLogout}
+              className="flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              {t.main.logout || "退出"}
+            </Button>
             <div className="flex items-center gap-2">
               {isConnected ? (
                 <Wifi className="w-4 h-4 text-green-500" />
