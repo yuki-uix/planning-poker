@@ -394,11 +394,16 @@ export default function PointEstimationTool() {
       const result = await updateTemplate(sessionId, currentUser, templateType);
       if (result.success && result.session) {
         setSession(result.session);
+        setSelectedVote(null);
+        // 更新持久化存储的投票信息
+        await updateUserVote(null);
         // 更新持久化存储的会话状态
         await updateSessionState(sessionId, {
           revealed: result.session.revealed,
           template: result.session.template,
         });
+        // 立即轮询以确保状态同步
+        await pollSession();
       }
     } catch {
       console.error("Failed to update template");
@@ -417,11 +422,16 @@ export default function PointEstimationTool() {
       );
       if (result.success && result.session) {
         setSession(result.session);
+        setSelectedVote(null);
+        // 更新持久化存储的投票信息
+        await updateUserVote(null);
         // 更新持久化存储的会话状态
         await updateSessionState(sessionId, {
           revealed: result.session.revealed,
           template: result.session.template,
         });
+        // 立即轮询以确保状态同步
+        await pollSession();
       }
     } catch {
       console.error("Failed to update custom cards");

@@ -234,8 +234,19 @@ export function updateSessionTemplate(
     return session;
   }
 
+  // 清除所有用户的投票记录
+  const updatedUsers = session.users.map((user) => ({
+    ...user,
+    vote: null,
+    hasVoted: false,
+    lastSeen: Date.now(),
+  }));
+
   const updatedSession = {
     ...session,
+    users: updatedUsers,
+    votes: {},
+    revealed: false,
     template: {
       type: templateType,
       customCards,
