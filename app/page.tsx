@@ -266,6 +266,8 @@ export default function PointEstimationTool() {
       if (result.success && result.session) {
         setSession(result.session);
         setSelectedVote(null);
+        // 立即轮询以确保状态同步
+        await pollSession();
       }
     } catch {
       console.error("Failed to reset votes");
@@ -366,16 +368,20 @@ export default function PointEstimationTool() {
           onTemplateChange={handleTemplateChange}
           onCustomCardsChange={handleCustomCardsChange}
         />
-
-        <VotingCards
-          session={session}
-          currentUser={currentUser}
-          selectedVote={selectedVote}
-          canVote={canVote}
-          onCastVote={handleCastVote}
-        />
-
-        <UserStatus session={session} currentUser={currentUser} />
+        <div className="flex flex-row gap-4">
+          <div className="flex-1">
+            <VotingCards
+              session={session}
+              currentUser={currentUser}
+              selectedVote={selectedVote}
+              canVote={canVote}
+              onCastVote={handleCastVote}
+            />
+          </div>
+          <div className="w-1/3">
+            <UserStatus session={session} currentUser={currentUser} />
+          </div>
+        </div>
 
         <ControlButtons
           session={session}
