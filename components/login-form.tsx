@@ -49,7 +49,7 @@ export function LoginForm({
           </div>
           <CardTitle className="text-2xl font-bold">{t.login.title}</CardTitle>
           <CardDescription>
-            {sessionId ? "加入现有会话" : t.login.subtitle}
+            {sessionId ? t.login.joinSession : t.login.subtitle}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -63,6 +63,7 @@ export function LoginForm({
               value={userName}
               onChange={(e) => setUserName(e.target.value)}
               disabled={isLoading}
+              autoComplete="off"
             />
           </div>
 

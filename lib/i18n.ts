@@ -18,6 +18,7 @@ export interface Translations {
   login: {
     title: string;
     subtitle: string;
+    joinSession: string;
     nameLabel: string;
     namePlaceholder: string;
     sessionIdLabel: string;
@@ -120,6 +121,7 @@ const translations: Record<Language, Translations> = {
     login: {
       title: "估点工具",
       subtitle: "加入或创建规划扑克会话",
+      joinSession: "加入会话",
       nameLabel: "你的姓名",
       namePlaceholder: "输入你的姓名",
       sessionIdLabel: "会话ID",
@@ -208,6 +210,7 @@ const translations: Record<Language, Translations> = {
     login: {
       title: "Point Estimation Tool",
       subtitle: "Join or create a planning poker session",
+      joinSession: "Join Session",
       nameLabel: "Your Name",
       namePlaceholder: "Enter your name",
       sessionIdLabel: "Session ID",
