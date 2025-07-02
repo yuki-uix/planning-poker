@@ -8,12 +8,15 @@ import { TemplateSettings } from "@/components/template-settings";
 import { UserStatus } from "@/components/user-status";
 import { VotingCards } from "@/components/voting-cards";
 import { calculateStats, checkAllUsersVoted } from "@/lib/estimation-utils";
+import { UserRole } from "@/lib/session-store";
 import {
-  UserRole,
-  saveUserInfoToStorage,
-  getUserInfoFromStorage,
-  clearUserInfoFromStorage,
-} from "@/lib/session-store";
+  saveUserData,
+  getUserData,
+  clearAllData,
+  updateUserVote,
+  updateSessionState,
+  migrateFromOldStorage,
+} from "@/lib/persistence";
 import { Session, TemplateType } from "@/types/estimation";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -38,6 +41,7 @@ export default function PointEstimationTool() {
   const [isConnected, setIsConnected] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(true);
 
   // 获取当前用户信息
   const currentUserData = session?.users.find((u) => u.id === currentUser);
@@ -45,58 +49,144 @@ export default function PointEstimationTool() {
   const canVote =
     currentUserData?.role === "attendance" || currentUserData?.role === "host";
 
-  // 页面加载时恢复用户状态
+  // 改进的页面加载时恢复用户状态
   useEffect(() => {
     const restoreUserState = async () => {
-      // 首先尝试从本地存储恢复用户信息
-      const storedUserInfo = getUserInfoFromStorage();
+      setIsRestoring(true);
 
-      if (storedUserInfo) {
-        // 如果有存储的用户信息，尝试恢复会话
-        setCurrentUser(storedUserInfo.userId);
-        setUserName(storedUserInfo.userName);
-        setSessionId(storedUserInfo.sessionId);
-        setSelectedRole(storedUserInfo.role);
+      try {
+        // 首先尝试迁移旧版本数据
+        await migrateFromOldStorage();
 
-        // 尝试获取会话数据
-        try {
-          const result = await getSessionData(storedUserInfo.sessionId);
-          if (result.success && result.session) {
-            // 检查用户是否还在会话中
-            const userExists = result.session.users.find(
-              (u) => u.id === storedUserInfo.userId
-            );
-            if (userExists) {
-              setSession(result.session);
-              setIsJoined(true);
-              setIsConnected(true);
-              setSelectedVote(userExists.vote);
-              return; // 成功恢复，不需要进一步处理
-            }
+        // 尝试从持久化存储恢复用户信息
+        const storedUserData = await getUserData();
+
+        if (storedUserData) {
+          // 如果有有效的存储用户信息，尝试恢复会话
+          setCurrentUser(storedUserData.userId);
+          setUserName(storedUserData.userName);
+          setSessionId(storedUserData.sessionId);
+          setSelectedRole(storedUserData.role);
+
+          // 恢复用户投票状态
+          if (storedUserData.lastVote !== undefined) {
+            setSelectedVote(storedUserData.lastVote);
           }
-        } catch (error) {
-          console.log("Failed to restore session, will show login form", error);
+
+          // 尝试获取会话数据
+          try {
+            const result = await getSessionData(storedUserData.sessionId);
+            if (result.success && result.session) {
+              // 检查用户是否还在会话中
+              const userExists = result.session.users.find(
+                (u) => u.id === storedUserData.userId
+              );
+
+              if (userExists) {
+                setSession(result.session);
+                setIsJoined(true);
+                setIsConnected(true);
+
+                // 如果服务器端没有投票记录但本地有，尝试恢复投票
+                if (!userExists.hasVoted && storedUserData.lastVote) {
+                  try {
+                    const voteResult = await castVote(
+                      storedUserData.sessionId,
+                      storedUserData.userId,
+                      storedUserData.lastVote
+                    );
+                    if (voteResult.success && voteResult.session) {
+                      setSession(voteResult.session);
+                    }
+                  } catch (error) {
+                    console.log(
+                      "Failed to restore vote, clearing local vote",
+                      error
+                    );
+                    setSelectedVote(null);
+                    await updateUserVote(null);
+                  }
+                }
+
+                return; // 成功恢复，不需要进一步处理
+              }
+            }
+          } catch (error) {
+            console.log(
+              "Failed to restore session, will show login form",
+              error
+            );
+          }
+
+          // 如果恢复失败，清除存储的信息
+          clearAllData();
         }
 
-        // 如果恢复失败，清除存储的信息
-        clearUserInfoFromStorage();
-      }
-
-      // 如果没有存储信息或恢复失败，从URL参数读取session ID
-      const urlParams = new URLSearchParams(window.location.search);
-      const sessionFromUrl = urlParams.get("session");
-      if (sessionFromUrl && !sessionId) {
-        setSessionId(sessionFromUrl);
-        // 如果从URL获取到sessionId，说明是受邀加入，只能选择attendance或guest
-        setSelectedRole("attendance");
-      } else if (!sessionFromUrl) {
-        // 如果没有sessionId参数，说明是初始用户，默认为host
-        setSelectedRole("host");
+        // 如果没有存储信息或恢复失败，从URL参数读取session ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionFromUrl = urlParams.get("session");
+        if (sessionFromUrl && !sessionId) {
+          setSessionId(sessionFromUrl);
+          // 如果从URL获取到sessionId，说明是受邀加入，只能选择attendance或guest
+          setSelectedRole("attendance");
+        } else if (!sessionFromUrl) {
+          // 如果没有sessionId参数，说明是初始用户，默认为host
+          setSelectedRole("host");
+        }
+      } catch (error) {
+        console.error("Error during state restoration:", error);
+        clearAllData();
+      } finally {
+        setIsRestoring(false);
       }
     };
 
     restoreUserState();
-  }, [sessionId, currentUser, userName]);
+  }, [sessionId, currentUser, userName, selectedRole]);
+
+  // 轮询会话数据
+  const pollSession = useCallback(async () => {
+    if (!sessionId || !currentUser) return;
+
+    try {
+      const result = await getSessionData(sessionId);
+      if (result.success && result.session) {
+        setSession(result.session);
+        setIsConnected(true);
+
+        // 更新持久化存储的会话状态
+        await updateSessionState(sessionId, {
+          revealed: result.session.revealed,
+          template: result.session.template,
+        });
+
+        // 更新持久化存储的用户投票信息
+        const currentUserInSession = result.session.users.find(
+          (u) => u.id === currentUser
+        );
+        if (currentUserInSession) {
+          setSelectedVote(currentUserInSession.vote);
+          await updateUserVote(currentUserInSession.vote);
+        }
+      } else {
+        setIsConnected(false);
+      }
+    } catch (error) {
+      console.error("Failed to poll session:", error);
+      setIsConnected(false);
+    }
+  }, [sessionId, currentUser]);
+
+  // 发送心跳
+  const sendHeartbeat = useCallback(async () => {
+    if (!sessionId || !currentUser) return;
+
+    try {
+      await heartbeat(sessionId, currentUser);
+    } catch (error) {
+      console.error("Failed to send heartbeat:", error);
+    }
+  }, [sessionId, currentUser]);
 
   // 更新URL以包含session ID
   useEffect(() => {
@@ -121,43 +211,9 @@ export default function PointEstimationTool() {
     }
   };
 
-  // Poll for session updates
-  const pollSession = useCallback(async () => {
-    if (!isJoined || !sessionId) return;
-
-    try {
-      const result = await getSessionData(sessionId);
-      if (result.success && result.session) {
-        setSession(result.session);
-        setIsConnected(true);
-
-        // Update selected vote based on current user's vote
-        const currentUserData = result.session.users.find(
-          (u) => u.id === currentUser
-        );
-        if (currentUserData) {
-          setSelectedVote(currentUserData.vote);
-        }
-      }
-    } catch {
-      setIsConnected(false);
-    }
-  }, [isJoined, sessionId, currentUser]);
-
-  // Send heartbeat to keep user active
-  const sendHeartbeat = useCallback(async () => {
-    if (!isJoined || !sessionId || !currentUser) return;
-
-    try {
-      await heartbeat(sessionId, currentUser);
-    } catch {
-      console.error("Heartbeat failed");
-    }
-  }, [isJoined, sessionId, currentUser]);
-
   // Set up polling and heartbeat
   useEffect(() => {
-    if (!isJoined) return;
+    if (!isJoined || isRestoring) return;
 
     // Initial poll
     pollSession();
@@ -172,7 +228,7 @@ export default function PointEstimationTool() {
       clearInterval(pollInterval);
       clearInterval(heartbeatInterval);
     };
-  }, [isJoined, pollSession, sendHeartbeat]);
+  }, [isJoined, isRestoring, pollSession, sendHeartbeat]);
 
   const handleCreateSession = async () => {
     if (!userName.trim()) return;
@@ -189,8 +245,18 @@ export default function PointEstimationTool() {
         setIsJoined(true);
         setIsConnected(true);
 
-        // 保存用户信息到本地存储
-        saveUserInfoToStorage(userId, userName, result.sessionId, "host");
+        // 保存用户信息到持久化存储，包括初始会话状态
+        await saveUserData({
+          userId,
+          userName,
+          sessionId: result.sessionId,
+          role: "host",
+          lastVote: null,
+          lastSessionState: {
+            revealed: result.session.revealed,
+            template: result.session.template,
+          },
+        });
       }
     } catch {
       console.error("Failed to create session");
@@ -219,8 +285,18 @@ export default function PointEstimationTool() {
         setIsJoined(true);
         setIsConnected(true);
 
-        // 保存用户信息到本地存储
-        saveUserInfoToStorage(userId, userName, sessionId, selectedRole);
+        // 保存用户信息到持久化存储，包括会话状态
+        await saveUserData({
+          userId,
+          userName,
+          sessionId,
+          role: selectedRole,
+          lastVote: null,
+          lastSessionState: {
+            revealed: result.session.revealed,
+            template: result.session.template,
+          },
+        });
       }
     } catch {
       console.error("Failed to join session");
@@ -234,6 +310,8 @@ export default function PointEstimationTool() {
     if (!session || !currentUser || !canVote) return;
 
     setSelectedVote(vote);
+    // 立即更新持久化存储的投票信息
+    await updateUserVote(vote);
 
     try {
       const result = await castVote(sessionId, currentUser, vote);
@@ -242,6 +320,12 @@ export default function PointEstimationTool() {
       }
     } catch {
       console.error("Failed to cast vote");
+      // 如果投票失败，恢复之前的投票状态
+      const currentUserInSession = session.users.find(
+        (u) => u.id === currentUser
+      );
+      setSelectedVote(currentUserInSession?.vote || null);
+      await updateUserVote(currentUserInSession?.vote || null);
     }
   };
 
@@ -252,6 +336,11 @@ export default function PointEstimationTool() {
       const result = await revealVotes(sessionId, currentUser);
       if (result.success && result.session) {
         setSession(result.session);
+        // 更新持久化存储的会话状态
+        await updateSessionState(sessionId, {
+          revealed: result.session.revealed,
+          template: result.session.template,
+        });
       }
     } catch {
       console.error("Failed to reveal votes");
@@ -266,6 +355,13 @@ export default function PointEstimationTool() {
       if (result.success && result.session) {
         setSession(result.session);
         setSelectedVote(null);
+        // 更新持久化存储的投票信息
+        await updateUserVote(null);
+        // 更新持久化存储的会话状态
+        await updateSessionState(sessionId, {
+          revealed: result.session.revealed,
+          template: result.session.template,
+        });
         // 立即轮询以确保状态同步
         await pollSession();
       }
@@ -281,6 +377,11 @@ export default function PointEstimationTool() {
       const result = await updateTemplate(sessionId, currentUser, templateType);
       if (result.success && result.session) {
         setSession(result.session);
+        // 更新持久化存储的会话状态
+        await updateSessionState(sessionId, {
+          revealed: result.session.revealed,
+          template: result.session.template,
+        });
       }
     } catch {
       console.error("Failed to update template");
@@ -299,6 +400,11 @@ export default function PointEstimationTool() {
       );
       if (result.success && result.session) {
         setSession(result.session);
+        // 更新持久化存储的会话状态
+        await updateSessionState(sessionId, {
+          revealed: result.session.revealed,
+          template: result.session.template,
+        });
       }
     } catch {
       console.error("Failed to update custom cards");
@@ -306,8 +412,8 @@ export default function PointEstimationTool() {
   };
 
   const handleLogout = () => {
-    // 清除本地存储的用户信息
-    clearUserInfoFromStorage();
+    // 清除持久化存储的用户信息
+    clearAllData();
 
     // 重置所有状态
     setCurrentUser("");
@@ -330,6 +436,18 @@ export default function PointEstimationTool() {
   // 计算统计数据
   const stats = session ? calculateStats(session) : null;
   const allUsersVoted = session ? checkAllUsersVoted(session) : false;
+
+  // 如果正在恢复状态，显示加载状态
+  if (isRestoring) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isJoined) {
     return (
@@ -378,7 +496,7 @@ export default function PointEstimationTool() {
               onCastVote={handleCastVote}
             />
           </div>
-          <div className="w-1/3">
+          <div className="w-1/2">
             <UserStatus session={session} currentUser={currentUser} />
           </div>
         </div>
