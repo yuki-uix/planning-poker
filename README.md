@@ -1,261 +1,217 @@
-# Point Estimation Tool / 估点工具
+# 估点工具 / Point Estimation Tool
 
-<div align="center">
-
-[English](#english) | [中文](#中文)
-
-</div>
+[English](#english) | [中文](#chinese)
 
 ---
 
-<div id="english">
+## English
 
-# Point Estimation Tool
+A real-time collaborative point estimation tool for agile teams, supporting planning poker sessions with role-based access control.
 
-A collaborative planning poker tool with multi-language interface and multiple estimation templates.
+### Features
 
-## 🌍 Multi-language Support
+- **Real-time Collaboration**: Multiple users can join sessions simultaneously
+- **Role-based Access Control**: Three distinct roles with different permissions
+  - **Host**: Create sessions, manage templates, control voting flow
+  - **Attendance**: Join sessions and participate in voting
+  - **Guest**: Observe sessions without voting
+- **Multiple Estimation Templates**: Fibonacci, Natural Numbers, Custom values
+- **Bilingual Support**: Chinese and English interface
+- **Responsive Design**: Works on desktop and mobile devices
+- **Real-time Updates**: Live session updates and user status
 
-This application supports both Chinese and English:
+### Tech Stack
 
-- **Auto-detection**: The app automatically detects browser language settings
-- **Manual switching**: Users can switch between Chinese and English anytime via the language toggle button
-- **Memory function**: User's language preference is saved in local storage
+- **Frontend**: Next.js 15, React, TypeScript
+- **Styling**: Tailwind CSS, shadcn/ui components
+- **State Management**: Server-side session storage
+- **Real-time**: Polling-based updates
 
-### Supported Languages
+### Getting Started
 
-- 🇨🇳 **Chinese (zh)**: Complete Chinese interface
-- 🇺🇸 **English (en)**: Complete English interface
+#### Prerequisites
 
-## 🎯 Estimation Templates
+- Node.js 18+
+- npm or yarn
 
-The app provides multiple preset estimation templates:
+#### Installation
 
-### 1. Fibonacci Sequence
-
-Classic agile estimation sequence
-
-```
-☕️, 0.5, 1, 2, 3, 5, 8, 13, 21
-```
-
-### 2. Natural Numbers
-
-Simple 1-10 natural number sequence
-
-```
-☕️, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
-```
-
-### 3. Custom
-
-Users can input completely custom estimation values separated by commas
-
-## 🚀 Features
-
-- **Real-time collaboration**: Multi-user real-time voting and result display
-- **Template management**: Flexible estimation template selection and customization
-- **Multi-language interface**: Chinese-English bilingual support
-- **Responsive design**: Adapts to various screen sizes
-- **Connection status**: Real-time connection status display
-- **Voting statistics**: Detailed vote distribution and team estimation
-
-## 🛠️ Tech Stack
-
-- **Frontend**: Next.js 15, React 19, TypeScript
-- **Styling**: Tailwind CSS, shadcn/ui
-- **State Management**: React Hooks
-- **Internationalization**: Custom i18n solution
-
-## 📦 Installation and Setup
+1. Clone the repository
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Start development server
-pnpm dev
-
-# Build for production
-pnpm build
-
-# Start production server
-pnpm start
+git clone <repository-url>
+cd estimation-tool
 ```
 
-## 🎨 Interface Screenshots
+2. Install dependencies
 
-### Login Interface
-
-- Supports Chinese-English switching
-- Auto-detects browser language
-- Clean user experience
-
-### Main Interface
-
-- Real-time voting status
-- Template settings panel
-- Voting result statistics
-
-## 🔧 Development Guide
-
-### Adding New Languages
-
-1. Add new language configuration in `lib/i18n.ts`
-2. Update the `Language` type definition
-3. Add language detection logic in the `detectLanguage` function
-
-### Adding New Translations
-
-1. Add new translation keys in the `Translations` interface
-2. Add corresponding translation text in all language configurations
-
-### Using Translations
-
-```typescript
-import { useLanguage } from "@/hooks/use-language";
-
-function MyComponent() {
-  const { t, language, toggleLanguage } = useLanguage();
-
-  return (
-    <div>
-      <h1>{t.login.title}</h1>
-      <button onClick={toggleLanguage}>Switch Language</button>
-    </div>
-  );
-}
+```bash
+npm install
 ```
 
-## 📝 License
+3. Run the development server
 
-MIT License
+```bash
+npm run dev
+```
 
-</div>
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+#### Usage
+
+1. **Create a Session (Host)**:
+
+   - Enter your name and session ID
+   - Select "Host" role
+   - Click "Create Session"
+
+2. **Join as Participant**:
+
+   - Enter your name and the session ID
+   - Select "Attendance" role
+   - Click "Join Session"
+
+3. **Join as Observer**:
+
+   - Enter your name and the session ID
+   - Select "Guest" role
+   - Click "Join Session"
+
+4. **Voting Process**:
+   - Participants select estimation points
+   - Host reveals votes when all participants have voted
+   - View results and statistics
+   - Host can reset votes for next round
+
+### Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+
+### Project Structure
+
+```
+estimation-tool/
+├── app/                 # Next.js app directory
+│   ├── actions.ts      # Server actions
+│   ├── layout.tsx      # Root layout
+│   └── page.tsx        # Main application page
+├── components/         # React components
+│   ├── ui/            # shadcn/ui components
+│   └── ...            # Custom components
+├── hooks/             # Custom React hooks
+├── lib/               # Utility functions and configurations
+└── public/            # Static assets
+```
 
 ---
 
-<div id="中文">
+## Chinese
 
-# 估点工具
+一个为敏捷团队设计的实时协作估点工具，支持基于角色的访问控制的规划扑克会话。
 
-一个协作式的规划扑克工具，支持多语言界面和多种估点模板。
+### 功能特性
 
-## 🌍 多语言支持
+- **实时协作**: 多个用户可以同时加入会话
+- **基于角色的访问控制**: 三种不同权限的角色
+  - **主持人**: 创建会话、管理模板、控制投票流程
+  - **参与者**: 加入会话并参与投票
+  - **旁观者**: 观察会话但不参与投票
+- **多种估点模板**: 菲波那契数列、自然数、自定义值
+- **双语支持**: 中文和英文界面
+- **响应式设计**: 支持桌面和移动设备
+- **实时更新**: 实时会话更新和用户状态
 
-本应用支持中文和英文两种语言：
+### 技术栈
 
-- **自动检测**: 应用会自动检测浏览器的语言设置
-- **手动切换**: 用户可以随时通过界面上的语言切换按钮在中英文之间切换
-- **记忆功能**: 用户的语言偏好会保存在本地存储中
+- **前端**: Next.js 15, React, TypeScript
+- **样式**: Tailwind CSS, shadcn/ui 组件
+- **状态管理**: 服务端会话存储
+- **实时性**: 基于轮询的更新
 
-### 支持的语言
+### 快速开始
 
-- 🇨🇳 **中文 (zh)**: 完整的中文界面
-- 🇺🇸 **英文 (en)**: 完整的英文界面
+#### 环境要求
 
-## 🎯 估点模板
+- Node.js 18+
+- npm 或 yarn
 
-应用提供多种预设的估点模板：
+#### 安装步骤
 
-### 1. 菲波那契数列 (Fibonacci Sequence)
-
-经典的敏捷估点序列
-
-```
-☕️, 0.5, 1, 2, 3, 5, 8, 13, 21
-```
-
-### 2. 自然数 (Natural Numbers)
-
-简单的 1-10 自然数序列
-
-```
-☕️, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
-```
-
-### 3. 自定义 (Custom)
-
-用户可以输入完全自定义的估点值，用逗号分隔
-
-## 🚀 功能特性
-
-- **实时协作**: 多用户实时投票和结果展示
-- **模板管理**: 灵活的估点模板选择和自定义
-- **多语言界面**: 中英文双语支持
-- **响应式设计**: 适配各种屏幕尺寸
-- **连接状态**: 实时显示连接状态
-- **投票统计**: 详细的投票分布和团队估点
-
-## 🛠️ 技术栈
-
-- **前端**: Next.js 15, React 19, TypeScript
-- **样式**: Tailwind CSS, shadcn/ui
-- **状态管理**: React Hooks
-- **国际化**: 自定义 i18n 解决方案
-
-## 📦 安装和运行
+1. 克隆仓库
 
 ```bash
-# 安装依赖
-pnpm install
-
-# 启动开发服务器
-pnpm dev
-
-# 构建生产版本
-pnpm build
-
-# 启动生产服务器
-pnpm start
+git clone <repository-url>
+cd estimation-tool
 ```
 
-## 🎨 界面截图
+2. 安装依赖
 
-### 登录界面
-
-- 支持中英文切换
-- 自动检测浏览器语言
-- 简洁的用户体验
-
-### 主界面
-
-- 实时投票状态
-- 模板设置面板
-- 投票结果统计
-
-## 🔧 开发说明
-
-### 添加新语言
-
-1. 在 `lib/i18n.ts` 中添加新的语言配置
-2. 更新 `Language` 类型定义
-3. 在 `detectLanguage` 函数中添加语言检测逻辑
-
-### 添加新翻译
-
-1. 在 `Translations` 接口中添加新的翻译键
-2. 在所有语言配置中添加对应的翻译文本
-
-### 使用翻译
-
-```typescript
-import { useLanguage } from "@/hooks/use-language";
-
-function MyComponent() {
-  const { t, language, toggleLanguage } = useLanguage();
-
-  return (
-    <div>
-      <h1>{t.login.title}</h1>
-      <button onClick={toggleLanguage}>切换语言</button>
-    </div>
-  );
-}
+```bash
+npm install
 ```
 
-## 📝 许可证
+3. 启动开发服务器
+
+```bash
+npm run dev
+```
+
+4. 在浏览器中打开 [http://localhost:3000](http://localhost:3000)
+
+#### 使用方法
+
+1. **创建会话 (主持人)**:
+
+   - 输入姓名和会话 ID
+   - 选择"主持人"角色
+   - 点击"创建会话"
+
+2. **作为参与者加入**:
+
+   - 输入姓名和会话 ID
+   - 选择"参与者"角色
+   - 点击"加入会话"
+
+3. **作为旁观者加入**:
+
+   - 输入姓名和会话 ID
+   - 选择"旁观者"角色
+   - 点击"加入会话"
+
+4. **投票流程**:
+   - 参与者选择估点值
+   - 主持人显示所有参与者的投票
+   - 查看结果和统计信息
+   - 主持人可以重置投票进行下一轮
+
+### 可用脚本
+
+- `npm run dev` - 启动开发服务器
+- `npm run build` - 构建生产版本
+- `npm run start` - 启动生产服务器
+- `npm run lint` - 运行 ESLint
+
+### 项目结构
+
+```
+estimation-tool/
+├── app/                 # Next.js 应用目录
+│   ├── actions.ts      # 服务端操作
+│   ├── layout.tsx      # 根布局
+│   └── page.tsx        # 主应用页面
+├── components/         # React 组件
+│   ├── ui/            # shadcn/ui 组件
+│   └── ...            # 自定义组件
+├── hooks/             # 自定义 React hooks
+├── lib/               # 工具函数和配置
+└── public/            # 静态资源
+```
+
+---
+
+## License
 
 MIT License
-
-</div>

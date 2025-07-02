@@ -22,8 +22,16 @@ export interface Translations {
     namePlaceholder: string;
     sessionIdLabel: string;
     sessionIdPlaceholder: string;
+    createButton: string;
     joinButton: string;
     joiningButton: string;
+    roleLabel: string;
+    roleHost: string;
+    roleAttendance: string;
+    roleGuest: string;
+    roleHostDescription: string;
+    roleAttendanceDescription: string;
+    roleGuestDescription: string;
   };
 
   // 主界面
@@ -36,6 +44,10 @@ export interface Translations {
     you: string;
     share: string;
     copied: string;
+    role: string;
+    host: string;
+    attendance: string;
+    guest: string;
   };
 
   // 模板设置
@@ -49,6 +61,7 @@ export interface Translations {
     customPlaceholder: string;
     currentCards: string;
     preview: string;
+    hostOnly: string;
   };
 
   // 投票
@@ -58,6 +71,8 @@ export interface Translations {
     statusTitle: string;
     revealButton: string;
     resetButton: string;
+    hostOnly: string;
+    cannotVote: string;
   };
 
   // 结果
@@ -108,8 +123,16 @@ const translations: Record<Language, Translations> = {
       namePlaceholder: "输入你的姓名",
       sessionIdLabel: "会话ID",
       sessionIdPlaceholder: "输入会话ID (例如: team-sprint-1)",
+      createButton: "创建会话",
       joinButton: "加入会话",
       joiningButton: "加入中...",
+      roleLabel: "选择角色",
+      roleHost: "主持人 (Host)",
+      roleAttendance: "参与者 (Attendance)",
+      roleGuest: "旁观者 (Guest)",
+      roleHostDescription: "创建会话，管理模板设置，控制投票流程",
+      roleAttendanceDescription: "参与投票，为故事估点",
+      roleGuestDescription: "旁观投票过程，查看结果",
     },
     main: {
       sessionTitle: "会话",
@@ -120,6 +143,10 @@ const translations: Record<Language, Translations> = {
       you: "你",
       share: "分享",
       copied: "已复制",
+      role: "角色",
+      host: "主持人",
+      attendance: "参与者",
+      guest: "旁观者",
     },
     templates: {
       title: "估点模板设置",
@@ -131,6 +158,7 @@ const translations: Record<Language, Translations> = {
       customPlaceholder: "输入估点值，用逗号分隔 (例如: ☕️,1,2,3,5,8,13)",
       currentCards: "当前卡片",
       preview: "当前模板预览",
+      hostOnly: "仅主持人可修改",
     },
     voting: {
       title: "选择你的估点",
@@ -138,6 +166,8 @@ const translations: Record<Language, Translations> = {
       statusTitle: "投票状态",
       revealButton: "显示投票",
       resetButton: "重置投票",
+      hostOnly: "仅主持人可操作",
+      cannotVote: "旁观者不能投票",
     },
     results: {
       title: "估点结果",
@@ -180,8 +210,17 @@ const translations: Record<Language, Translations> = {
       namePlaceholder: "Enter your name",
       sessionIdLabel: "Session ID",
       sessionIdPlaceholder: "Enter session ID (e.g., team-sprint-1)",
+      createButton: "Create Session",
       joinButton: "Join Session",
       joiningButton: "Joining...",
+      roleLabel: "Select Role",
+      roleHost: "Host",
+      roleAttendance: "Attendance",
+      roleGuest: "Guest",
+      roleHostDescription:
+        "Create session, manage templates, control voting flow",
+      roleAttendanceDescription: "Participate in voting, estimate stories",
+      roleGuestDescription: "Observe voting process, view results",
     },
     main: {
       sessionTitle: "Session",
@@ -192,6 +231,10 @@ const translations: Record<Language, Translations> = {
       you: "You",
       share: "Share",
       copied: "Copied",
+      role: "Role",
+      host: "Host",
+      attendance: "Attendance",
+      guest: "Guest",
     },
     templates: {
       title: "Estimation Template Settings",
@@ -204,6 +247,7 @@ const translations: Record<Language, Translations> = {
         "Enter estimation values separated by commas (e.g., ☕️,1,2,3,5,8,13)",
       currentCards: "Current Cards",
       preview: "Current Template Preview",
+      hostOnly: "Host only",
     },
     voting: {
       title: "Select Your Estimate",
@@ -212,6 +256,8 @@ const translations: Record<Language, Translations> = {
       statusTitle: "Voting Status",
       revealButton: "Reveal Votes",
       resetButton: "Reset Votes",
+      hostOnly: "Host only",
+      cannotVote: "Guests cannot vote",
     },
     results: {
       title: "Estimation Results",
