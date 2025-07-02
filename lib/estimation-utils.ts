@@ -16,13 +16,21 @@ export function getCurrentEstimationCards(session: Session): string[] {
       .map((card) => card.trim())
       .filter((card) => card.length > 0);
   }
-  return ESTIMATION_TEMPLATES[selectedTemplate].cards;
+  return [...ESTIMATION_TEMPLATES[selectedTemplate].cards];
 }
 
 export function calculateStats(session: Session): EstimationStats | null {
   if (!session.revealed) return null;
 
-  const votes = Object.values(session.votes);
+  // 只获取attendance和host角色的用户投票
+  const votingUsers = session.users.filter(
+    (user) => user.role === "attendance" || user.role === "host"
+  );
+  
+  const votes = votingUsers
+    .filter((user) => user.hasVoted && user.vote)
+    .map((user) => user.vote!);
+    
   const numericVotes = votes
     .filter((vote) => vote !== "☕️")
     .map((vote) => Number.parseFloat(vote))

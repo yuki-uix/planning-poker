@@ -46,24 +46,43 @@ export function VotingCards({
         .map((card) => card.trim())
         .filter((card) => card.length > 0);
     }
-    return ESTIMATION_TEMPLATES[selectedTemplate].cards;
+    return [...ESTIMATION_TEMPLATES[selectedTemplate].cards];
   };
 
   const currentEstimationCards = getCurrentEstimationCards();
 
+  // 如果是guest用户，显示投票卡片但不能点击
+  if (currentUserData?.role === "guest") {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t.voting.title}</CardTitle>
+          <CardDescription>{t.voting.subtitle}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-4 md:grid-cols-7 gap-4">
+            {currentEstimationCards.map((card) => (
+              <Button
+                key={card}
+                variant="outline"
+                className="h-20 text-lg font-bold opacity-60 cursor-not-allowed"
+                disabled={true}
+              >
+                {card}
+              </Button>
+            ))}
+          </div>
+          <div className="mt-4 text-center text-sm text-muted-foreground">
+            <EyeOff className="w-4 h-4 inline mr-1" />
+            {t.voting.cannotVote}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // 如果不能投票且不是guest，不显示任何内容
   if (!canVote) {
-    if (currentUserData?.role === "guest") {
-      return (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center text-muted-foreground">
-              <EyeOff className="w-8 h-8 mx-auto mb-2" />
-              <p>{t.voting.cannotVote}</p>
-            </div>
-          </CardContent>
-        </Card>
-      );
-    }
     return null;
   }
 

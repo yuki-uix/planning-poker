@@ -30,7 +30,7 @@ export function ResultsDisplay({ session, stats }: ResultsDisplayProps) {
         .map((card) => card.trim())
         .filter((card) => card.length > 0);
     }
-    return ESTIMATION_TEMPLATES[selectedTemplate].cards;
+    return [...ESTIMATION_TEMPLATES[selectedTemplate].cards];
   };
 
   const currentEstimationCards = getCurrentEstimationCards();
