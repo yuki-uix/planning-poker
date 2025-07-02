@@ -75,6 +75,9 @@ export interface Translations {
     resetButton: string;
     hostOnly: string;
     cannotVote: string;
+    votedUsers: string;
+    notVotedUsers: string;
+    guestUsers: string;
   };
 
   // 结果
@@ -172,6 +175,9 @@ const translations: Record<Language, Translations> = {
       resetButton: "重置投票",
       hostOnly: "仅主持人可操作",
       cannotVote: "旁观者不能投票",
+      votedUsers: "已投票",
+      notVotedUsers: "未投票",
+      guestUsers: "访客",
     },
     results: {
       title: "估点结果",
@@ -264,6 +270,9 @@ const translations: Record<Language, Translations> = {
       resetButton: "Reset Votes",
       hostOnly: "Host only",
       cannotVote: "Guests cannot vote",
+      votedUsers: "Voted",
+      notVotedUsers: "Not Voted",
+      guestUsers: "Guests",
     },
     results: {
       title: "Estimation Results",

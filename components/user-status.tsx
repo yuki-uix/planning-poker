@@ -2,9 +2,9 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Crown, User, EyeOff } from "lucide-react";
+import { Crown, User as UserIcon, EyeOff } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
-import { Session } from "@/types/estimation";
+import { Session, User } from "@/types/estimation";
 
 interface UserStatusProps {
   session: Session;
@@ -14,46 +14,91 @@ interface UserStatusProps {
 export function UserStatus({ session, currentUser }: UserStatusProps) {
   const { t } = useLanguage();
 
+  // 分离已投票和未投票的用户
+  const votedUsers = session.users.filter(
+    (user) => user.hasVoted && (user.role === "attendance" || user.role === "host")
+  );
+  const notVotedUsers = session.users.filter(
+    (user) => !user.hasVoted && (user.role === "attendance" || user.role === "host")
+  );
+  const guestUsers = session.users.filter((user) => user.role === "guest");
+
+  const renderUserCard = (user: User) => (
+    <div
+      key={user.id}
+      className="space-y-2 w-auto bg-white p-3 rounded-lg border border-gray-200"
+    >
+      <div className="flex justify-center items-center gap-2">
+        <div
+          className={`w-3 h-3 rounded-full ${
+            user.id === currentUser ? "bg-blue-500" : "bg-green-500"
+          }`}
+        />
+        <span className="text-sm font-medium">
+          {user.name} {user.id === currentUser && `(${t.main.you})`}
+        </span>
+      </div>
+      <div className="flex justify-center items-center gap-2">
+        <Badge variant="outline" className="text-xs">
+          {user.role === "host" && <Crown className="w-3 h-3 mr-1" />}
+          {user.role === "attendance" && (
+            <UserIcon className="w-3 h-3 mr-1" />
+          )}
+          {user.role === "guest" && <EyeOff className="w-3 h-3 mr-1" />}
+          {t.main[user.role as keyof typeof t.main]}
+        </Badge>
+        {user.hasVoted &&
+          (user.role === "attendance" || user.role === "host") && (
+            <Badge variant={session.revealed ? "default" : "secondary"}>
+              {session.revealed ? user.vote : "✓"}
+            </Badge>
+          )}
+      </div>
+    </div>
+  );
+
   return (
     <Card className="h-full">
       <CardHeader>
         <CardTitle>{t.voting.statusTitle}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-wrap gap-4">
-          {session.users.map((user) => (
-            <div
-              key={user.id}
-              className="space-y-2 w-auto bg-white p-3 rounded-lg border border-gray-200"
-            >
-              <div className="flex justify-center items-center gap-2">
-                <div
-                  className={`w-3 h-3 rounded-full ${
-                    user.id === currentUser ? "bg-blue-500" : "bg-green-500"
-                  }`}
-                />
-                <span className="text-sm font-medium">
-                  {user.name} {user.id === currentUser && `(${t.main.you})`}
-                </span>
-              </div>
-              <div className="flex justify-center items-center gap-2">
-                <Badge variant="outline" className="text-xs">
-                  {user.role === "host" && <Crown className="w-3 h-3 mr-1" />}
-                  {user.role === "attendance" && (
-                    <User className="w-3 h-3 mr-1" />
-                  )}
-                  {user.role === "guest" && <EyeOff className="w-3 h-3 mr-1" />}
-                  {t.main[user.role]}
-                </Badge>
-                {user.hasVoted &&
-                  (user.role === "attendance" || user.role === "host") && (
-                    <Badge variant={session.revealed ? "default" : "secondary"}>
-                      {session.revealed ? user.vote : "✓"}
-                    </Badge>
-                  )}
+        <div className="space-y-4">
+          {/* 已投票的用户 */}
+          {votedUsers.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-green-600 mb-2">
+                ✓ {t.voting.votedUsers} ({votedUsers.length})
+              </h3>
+              <div className="flex flex-wrap gap-4">
+                {votedUsers.map(renderUserCard)}
               </div>
             </div>
-          ))}
+          )}
+
+          {/* 未投票的用户 */}
+          {notVotedUsers.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-orange-600 mb-2">
+                ⏳ {t.voting.notVotedUsers} ({notVotedUsers.length})
+              </h3>
+              <div className="flex flex-wrap gap-4">
+                {notVotedUsers.map(renderUserCard)}
+              </div>
+            </div>
+          )}
+
+          {/* 访客用户 */}
+          {guestUsers.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-600 mb-2">
+                👁️ {t.voting.guestUsers} ({guestUsers.length})
+              </h3>
+              <div className="flex flex-wrap gap-4">
+                {guestUsers.map(renderUserCard)}
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
