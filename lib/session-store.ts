@@ -1,133 +1,260 @@
 // Server-side session storage
+export type UserRole = "host" | "attendance" | "guest";
+
 interface User {
-  id: string
-  name: string
-  vote: string | null
-  hasVoted: boolean
-  lastSeen: number
+  id: string;
+  name: string;
+  role: UserRole;
+  vote: string | null;
+  hasVoted: boolean;
+  lastSeen: number;
 }
 
 interface Session {
-  id: string
-  users: User[]
-  revealed: boolean
-  votes: Record<string, string>
-  createdAt: number
+  id: string;
+  users: User[];
+  revealed: boolean;
+  votes: Record<string, string>;
+  createdAt: number;
+  hostId: string; // 添加host ID字段
+  template: {
+    type: string;
+    customCards?: string;
+  };
 }
 
 // In-memory storage (in production, use Redis or database)
-const sessions = new Map<string, Session>()
+const sessions = new Map<string, Session>();
 
 export function getSession(sessionId: string): Session | null {
-  const session = sessions.get(sessionId)
-  if (!session) return null
+  const session = sessions.get(sessionId);
+  if (!session) return null;
 
   // Clean up inactive users (not seen for 30 seconds)
-  const now = Date.now()
-  const activeUsers = session.users.filter((user) => now - user.lastSeen < 30000)
+  const now = Date.now();
+  const activeUsers = session.users.filter(
+    (user) => now - user.lastSeen < 30000
+  );
 
   if (activeUsers.length !== session.users.length) {
-    const updatedSession = { ...session, users: activeUsers }
-    sessions.set(sessionId, updatedSession)
-    return updatedSession
+    const updatedSession = { ...session, users: activeUsers };
+    sessions.set(sessionId, updatedSession);
+    return updatedSession;
   }
 
-  return session
+  return session;
 }
 
-export function createOrJoinSession(sessionId: string, userId: string, userName: string): Session {
-  const existingSession = getSession(sessionId)
-  const now = Date.now()
+export function createSession(
+  sessionId: string,
+  userId: string,
+  userName: string
+): Session {
+  const now = Date.now();
+
+  const hostUser: User = {
+    id: userId,
+    name: userName,
+    role: "host",
+    vote: null,
+    hasVoted: false,
+    lastSeen: now,
+  };
+
+  const newSession: Session = {
+    id: sessionId,
+    users: [hostUser],
+    revealed: false,
+    votes: {},
+    createdAt: now,
+    hostId: userId,
+    template: {
+      type: "fibonacci",
+      customCards: "☕️,1,2,3,5,8,13",
+    },
+  };
+
+  sessions.set(sessionId, newSession);
+  return newSession;
+}
+
+export function joinSession(
+  sessionId: string,
+  userId: string,
+  userName: string,
+  role: UserRole
+): Session {
+  const existingSession = getSession(sessionId);
+  const now = Date.now();
+
+  if (!existingSession) {
+    throw new Error("Session not found");
+  }
 
   const newUser: User = {
     id: userId,
     name: userName,
+    role,
     vote: null,
     hasVoted: false,
     lastSeen: now,
-  }
+  };
+
+  // Remove existing user with same ID and add new one
+  const otherUsers = existingSession.users.filter((user) => user.id !== userId);
+  const updatedSession = {
+    ...existingSession,
+    users: [...otherUsers, newUser],
+  };
+  sessions.set(sessionId, updatedSession);
+  return updatedSession;
+}
+
+// 保持向后兼容的函数
+export function createOrJoinSession(
+  sessionId: string,
+  userId: string,
+  userName: string
+): Session {
+  const existingSession = getSession(sessionId);
 
   if (existingSession) {
-    // Remove existing user with same ID and add new one
-    const otherUsers = existingSession.users.filter((user) => user.id !== userId)
-    const updatedSession = {
-      ...existingSession,
-      users: [...otherUsers, newUser],
-    }
-    sessions.set(sessionId, updatedSession)
-    return updatedSession
+    return joinSession(sessionId, userId, userName, "attendance");
   } else {
-    // Create new session
-    const newSession: Session = {
-      id: sessionId,
-      users: [newUser],
-      revealed: false,
-      votes: {},
-      createdAt: now,
-    }
-    sessions.set(sessionId, newSession)
-    return newSession
+    return createSession(sessionId, userId, userName);
   }
 }
 
-export function updateUserVote(sessionId: string, userId: string, vote: string): Session | null {
-  const session = getSession(sessionId)
-  if (!session) return null
+export function updateUserVote(
+  sessionId: string,
+  userId: string,
+  vote: string
+): Session | null {
+  const session = getSession(sessionId);
+  if (!session) return null;
+
+  // host和attendance角色都可以投票
+  const user = session.users.find((u) => u.id === userId);
+  if (!user || (user.role !== "attendance" && user.role !== "host")) {
+    return session;
+  }
 
   const updatedUsers = session.users.map((user) =>
-    user.id === userId ? { ...user, vote, hasVoted: true, lastSeen: Date.now() } : user,
-  )
+    user.id === userId
+      ? { ...user, vote, hasVoted: true, lastSeen: Date.now() }
+      : user
+  );
 
-  const updatedVotes = { ...session.votes, [userId]: vote }
+  const updatedVotes = { ...session.votes, [userId]: vote };
 
   const updatedSession = {
     ...session,
     users: updatedUsers,
     votes: updatedVotes,
+  };
+
+  sessions.set(sessionId, updatedSession);
+  return updatedSession;
+}
+
+export function revealSessionVotes(
+  sessionId: string,
+  userId: string
+): Session | null {
+  const session = getSession(sessionId);
+  if (!session) return null;
+
+  // 只有host可以reveal votes
+  if (session.hostId !== userId) {
+    return session;
   }
 
-  sessions.set(sessionId, updatedSession)
-  return updatedSession
+  const updatedSession = { ...session, revealed: true };
+  sessions.set(sessionId, updatedSession);
+  return updatedSession;
 }
 
-export function revealSessionVotes(sessionId: string): Session | null {
-  const session = getSession(sessionId)
-  if (!session) return null
+export function resetSessionVotes(
+  sessionId: string,
+  userId: string
+): Session | null {
+  const session = getSession(sessionId);
+  if (!session) return null;
 
-  const updatedSession = { ...session, revealed: true }
-  sessions.set(sessionId, updatedSession)
-  return updatedSession
-}
-
-export function resetSessionVotes(sessionId: string): Session | null {
-  const session = getSession(sessionId)
-  if (!session) return null
+  // 只有host可以reset votes
+  if (session.hostId !== userId) {
+    return session;
+  }
 
   const updatedUsers = session.users.map((user) => ({
     ...user,
     vote: null,
     hasVoted: false,
     lastSeen: Date.now(),
-  }))
+  }));
 
   const updatedSession = {
     ...session,
     users: updatedUsers,
     votes: {},
     revealed: false,
-  }
+  };
 
-  sessions.set(sessionId, updatedSession)
-  return updatedSession
+  sessions.set(sessionId, updatedSession);
+  return updatedSession;
 }
 
-export function updateUserHeartbeat(sessionId: string, userId: string): Session | null {
-  const session = getSession(sessionId)
-  if (!session) return null
+export function updateUserHeartbeat(
+  sessionId: string,
+  userId: string
+): Session | null {
+  const session = getSession(sessionId);
+  if (!session) return null;
 
-  const updatedUsers = session.users.map((user) => (user.id === userId ? { ...user, lastSeen: Date.now() } : user))
+  const updatedUsers = session.users.map((user) =>
+    user.id === userId ? { ...user, lastSeen: Date.now() } : user
+  );
 
-  const updatedSession = { ...session, users: updatedUsers }
-  sessions.set(sessionId, updatedSession)
-  return updatedSession
+  const updatedSession = { ...session, users: updatedUsers };
+  sessions.set(sessionId, updatedSession);
+  return updatedSession;
+}
+
+export function updateSessionTemplate(
+  sessionId: string,
+  userId: string,
+  templateType: string,
+  customCards?: string
+): Session | null {
+  const session = getSession(sessionId);
+  if (!session) return null;
+
+  // 只有host可以更新模板设置
+  if (session.hostId !== userId) {
+    return session;
+  }
+
+  const updatedSession = {
+    ...session,
+    template: {
+      type: templateType,
+      customCards,
+    },
+  };
+
+  sessions.set(sessionId, updatedSession);
+  return updatedSession;
+}
+
+// 检查用户是否为host
+export function isHost(sessionId: string, userId: string): boolean {
+  const session = getSession(sessionId);
+  return session?.hostId === userId;
+}
+
+// 检查用户是否可以投票
+export function canVote(sessionId: string, userId: string): boolean {
+  const session = getSession(sessionId);
+  const user = session?.users.find((u) => u.id === userId);
+  return user?.role === "attendance" || user?.role === "host";
 }
