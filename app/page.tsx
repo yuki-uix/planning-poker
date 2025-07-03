@@ -238,8 +238,8 @@ export default function PointEstimationTool() {
     // Set up polling interval (every 2 seconds)
     const pollInterval = setInterval(pollSession, 2000);
 
-    // Set up heartbeat interval (every 10 seconds)
-    const heartbeatInterval = setInterval(sendHeartbeat, 10000);
+    // Set up heartbeat interval (every 5 seconds)
+    const heartbeatInterval = setInterval(sendHeartbeat, 5000);
 
     return () => {
       clearInterval(pollInterval);
