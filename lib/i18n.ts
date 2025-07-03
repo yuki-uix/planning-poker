@@ -106,6 +106,16 @@ export interface Translations {
     powers: string;
     custom: string;
   };
+
+  // 错误信息
+  errors: {
+    sessionNotFound: {
+      title: string;
+      description: string;
+      backToHostButton: string;
+      closeButton: string;
+    };
+  };
 }
 
 const translations: Record<Language, Translations> = {
@@ -199,6 +209,14 @@ const translations: Record<Language, Translations> = {
       tshirt: "XS到XXL的尺码估点",
       powers: "2的幂次序列",
       custom: "输入自定义估点值",
+    },
+    errors: {
+      sessionNotFound: {
+        title: "会话不存在",
+        description: "无法找到指定的会话。请确认分享链接是否正确，或联系主持人确认会话状态。",
+        backToHostButton: "回到主持人页面",
+        closeButton: "关闭",
+      },
     },
   },
   en: {
@@ -294,6 +312,14 @@ const translations: Record<Language, Translations> = {
       tshirt: "XS to XXL size estimation",
       powers: "Powers of 2 sequence",
       custom: "Enter custom estimation values",
+    },
+    errors: {
+      sessionNotFound: {
+        title: "Session Not Found",
+        description: "Unable to find the specified session. Please verify the share link is correct, or contact the host to confirm the session status.",
+        backToHostButton: "Back to Host Page",
+        closeButton: "Close",
+      },
     },
   },
 };

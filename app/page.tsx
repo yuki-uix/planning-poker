@@ -4,6 +4,7 @@ import { ControlButtons } from "@/components/control-buttons";
 import { LoginForm } from "@/components/login-form";
 import { ResultsDisplay } from "@/components/results-display";
 import { SessionHeader } from "@/components/session-header";
+import { SessionErrorModal } from "@/components/session-error-modal";
 import { TemplateSettings } from "@/components/template-settings";
 import { UserStatus } from "@/components/user-status";
 import { VotingCards } from "@/components/voting-cards";
@@ -43,6 +44,7 @@ export default function PointEstimationTool() {
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isRestoring, setIsRestoring] = useState(true);
+  const [showSessionErrorModal, setShowSessionErrorModal] = useState(false);
 
   // 获取当前用户信息
   const currentUserData = session?.users.find((u) => u.id === currentUser);
@@ -314,10 +316,15 @@ export default function PointEstimationTool() {
             template: result.session.template,
           },
         });
+      } else {
+        // session 不存在，显示错误 modal
+        setShowSessionErrorModal(true);
       }
     } catch {
       console.error("Failed to join session");
       setIsConnected(false);
+      // 发生错误时也显示 modal
+      setShowSessionErrorModal(true);
     } finally {
       setIsLoading(false);
     }
@@ -480,6 +487,26 @@ export default function PointEstimationTool() {
     performLogout();
   };
 
+  const handleBackToHost = () => {
+    // 关闭 modal
+    setShowSessionErrorModal(false);
+    // 清除持久化存储的用户信息
+    clearAllData();
+    // 清除当前 sessionId，回到主持人创建页面
+    setSessionId("");
+    setSelectedRole("host");
+    // 清除用户信息
+    setCurrentUser("");
+    setUserName("");
+    setSelectedVote(null);
+    setIsJoined(false);
+    setIsConnected(true);
+    // 清除 URL 参数
+    const url = new URL(window.location.href);
+    url.searchParams.delete("session");
+    window.history.replaceState({}, "", url.toString());
+  };
+
   // 计算统计数据
   const stats = session ? calculateStats(session) : null;
   const allUsersVoted = session ? checkAllUsersVoted(session) : false;
@@ -498,66 +525,81 @@ export default function PointEstimationTool() {
 
   if (!isJoined) {
     return (
-      <LoginForm
-        sessionId={sessionId}
-        userName={userName}
-        setUserName={setUserName}
-        selectedRole={selectedRole}
-        setSelectedRole={setSelectedRole}
-        isLoading={isLoading}
-        onCreateSession={handleCreateSession}
-        onJoinSession={handleJoinSession}
-      />
+      <>
+        <LoginForm
+          sessionId={sessionId}
+          userName={userName}
+          setUserName={setUserName}
+          selectedRole={selectedRole}
+          setSelectedRole={setSelectedRole}
+          isLoading={isLoading}
+          onCreateSession={handleCreateSession}
+          onJoinSession={handleJoinSession}
+        />
+        <SessionErrorModal
+          isOpen={showSessionErrorModal}
+          onClose={() => setShowSessionErrorModal(false)}
+          onBackToHost={handleBackToHost}
+        />
+      </>
     );
   }
 
   if (!session) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <SessionHeader
-          session={session}
-          sessionId={sessionId}
-          userName={userName}
-          currentUser={currentUser}
-          isConnected={isConnected}
-          copied={copied}
-          onCopyShareLink={copyShareLink}
-          onLogout={handleLogout}
-        />
+    <>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <SessionHeader
+            session={session}
+            sessionId={sessionId}
+            userName={userName}
+            currentUser={currentUser}
+            isConnected={isConnected}
+            copied={copied}
+            onCopyShareLink={copyShareLink}
+            onLogout={handleLogout}
+          />
 
-        <TemplateSettings
-          session={session}
-          isHost={isHost}
-          onTemplateChange={handleTemplateChange}
-          onCustomCardsChange={handleCustomCardsChange}
-        />
-        <div className="flex flex-row gap-4">
-          <div className="flex-1">
-            <VotingCards
-              session={session}
-              currentUser={currentUser}
-              selectedVote={selectedVote}
-              canVote={canVote}
-              onCastVote={handleCastVote}
-            />
+          <TemplateSettings
+            session={session}
+            isHost={isHost}
+            onTemplateChange={handleTemplateChange}
+            onCustomCardsChange={handleCustomCardsChange}
+          />
+          <div className="flex flex-row gap-4">
+            <div className="flex-1">
+              <VotingCards
+                session={session}
+                currentUser={currentUser}
+                selectedVote={selectedVote}
+                canVote={canVote}
+                onCastVote={handleCastVote}
+              />
+            </div>
+            <div className="w-1/2">
+              <UserStatus session={session} currentUser={currentUser} />
+            </div>
           </div>
-          <div className="w-1/2">
-            <UserStatus session={session} currentUser={currentUser} />
-          </div>
+
+          <ControlButtons
+            session={session}
+            isHost={isHost}
+            allUsersVoted={allUsersVoted}
+            onRevealVotes={handleRevealVotes}
+            onResetVotes={handleResetVotes}
+          />
+
+          {stats && <ResultsDisplay session={session} stats={stats} />}
         </div>
-
-        <ControlButtons
-          session={session}
-          isHost={isHost}
-          allUsersVoted={allUsersVoted}
-          onRevealVotes={handleRevealVotes}
-          onResetVotes={handleResetVotes}
-        />
-
-        {stats && <ResultsDisplay session={session} stats={stats} />}
       </div>
-    </div>
+
+      <SessionErrorModal
+        isOpen={showSessionErrorModal}
+        onClose={() => setShowSessionErrorModal(false)}
+        onBackToHost={handleBackToHost}
+      />
+    </>
   );
 }
