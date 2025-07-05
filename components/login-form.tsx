@@ -40,14 +40,14 @@ export function LoginForm({
   const { t } = useLanguage();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex items-center justify-between mb-4">
             <div></div>
             <LanguageSwitcher />
           </div>
-          <CardTitle className="text-2xl font-bold">{t.login.title}</CardTitle>
+          <CardTitle className="text-2xl font-bold text-title">{t.login.title}</CardTitle>
           <CardDescription>
             {sessionId ? t.login.joinSession : t.login.subtitle}
           </CardDescription>

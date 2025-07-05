@@ -17,6 +17,7 @@ A real-time collaborative point estimation tool for agile teams, supporting plan
   - **Guest**: Observe sessions without voting
 - **Multiple Estimation Templates**: Fibonacci, Natural Numbers, Custom values
 - **Bilingual Support**: Chinese and English interface
+- **Theme Color Customization**: Four beautiful theme colors to choose from
 - **Responsive Design**: Works on desktop and mobile devices
 - **Real-time Updates**: Live session updates and user status
 
@@ -121,6 +122,7 @@ estimation-tool/
   - **旁观者**: 观察会话但不参与投票
 - **多种估点模板**: 菲波那契数列、自然数、自定义值
 - **双语支持**: 中文和英文界面
+- **主题色自定义**: 四种精美主题色供选择
 - **响应式设计**: 支持桌面和移动设备
 - **实时更新**: 实时会话更新和用户状态
 

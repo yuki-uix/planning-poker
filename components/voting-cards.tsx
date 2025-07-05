@@ -56,7 +56,7 @@ export function VotingCards({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>{t.voting.title}</CardTitle>
+          <CardTitle className="text-title">{t.voting.title}</CardTitle>
           <CardDescription>{t.voting.subtitle}</CardDescription>
         </CardHeader>
         <CardContent>
@@ -87,11 +87,11 @@ export function VotingCards({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t.voting.title}</CardTitle>
-        <CardDescription>{t.voting.subtitle}</CardDescription>
-      </CardHeader>
+          <Card>
+        <CardHeader>
+          <CardTitle className="text-title">{t.voting.title}</CardTitle>
+          <CardDescription>{t.voting.subtitle}</CardDescription>
+        </CardHeader>
       <CardContent>
         <div className="grid grid-cols-4 md:grid-cols-7 gap-4">
           {currentEstimationCards.map((card) => (

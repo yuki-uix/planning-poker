@@ -60,7 +60,7 @@ export function UserStatus({ session, currentUser }: UserStatusProps) {
   return (
     <Card className="h-full">
       <CardHeader>
-        <CardTitle>{t.voting.statusTitle}</CardTitle>
+        <CardTitle className="text-title">{t.voting.statusTitle}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">

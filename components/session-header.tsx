@@ -1,6 +1,7 @@
 "use client";
 
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { ThemeColorPicker } from "@/components/theme-color-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,9 +51,10 @@ export function SessionHeader({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        {/* 第一行：会话标题和用户信息 */}
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <CardTitle className="text-2xl font-bold">
+            <CardTitle className="text-2xl font-bold text-title">
               {t.main.sessionTitle}: {sessionId}
             </CardTitle>
             <CardDescription>
@@ -71,30 +73,7 @@ export function SessionHeader({
               </Badge>
             </CardDescription>
           </div>
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onCopyShareLink}
-              className="flex items-center gap-2"
-            >
-              {copied ? (
-                <Check className="w-4 h-4 text-green-500" />
-              ) : (
-                <Share2 className="w-4 h-4" />
-              )}
-              {copied ? t.main.copied : t.main.share}
-            </Button>
-            <LanguageSwitcher />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onLogout}
-              className="flex items-center gap-2"
-            >
-              <LogOut className="w-4 h-4" />
-              {t.main.logout || "退出"}
-            </Button>
+          <div className="flex items-center gap-2">
             <div className="flex items-center gap-2">
               {isConnected ? (
                 <Wifi className="w-4 h-4 text-green-500" />
@@ -111,6 +90,38 @@ export function SessionHeader({
                 {session.users.length || 0} {t.main.users}
               </span>
             </div>
+          </div>
+        </div>
+        
+        {/* 第二行：操作按钮和设置 */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+          <ThemeColorPicker compact />
+          </div>
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onCopyShareLink}
+              className="flex items-center gap-2"
+            >
+              {copied ? (
+                <Check className="w-4 h-4 text-green-500" />
+              ) : (
+                <Share2 className="w-4 h-4" />
+              )}
+              {copied ? t.main.copied : t.main.share}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onLogout}
+              className="flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              {t.main.logout || "退出"}
+            </Button>
           </div>
         </div>
       </CardHeader>

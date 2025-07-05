@@ -47,6 +47,74 @@ body {
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* 主题色变量 - 默认青色 */
+    --theme-primary: 188 40% 45%;
+    --theme-primary-foreground: 0 0% 98%;
+    --theme-ring: 188 40% 45%;
+    --theme-background: 188 40% 95%;
+    --theme-card-background: 0 0% 100%;
+    --theme-title: 188 40% 25%;
+  }
+
+  /* 绿色主题 */
+  [data-color-theme="green"] {
+    --theme-primary: 142 25% 45%;
+    --theme-primary-foreground: 0 0% 98%;
+    --theme-ring: 142 25% 45%;
+    --theme-background: 142 25% 95%;
+    --theme-card-background: 0 0% 100%;
+    --theme-title: 142 25% 25%;
+  }
+
+  /* 青色主题 */
+  [data-color-theme="cyan"] {
+    --theme-primary: 188 40% 45%;
+    --theme-primary-foreground: 0 0% 98%;
+    --theme-ring: 188 40% 45%;
+    --theme-background: 188 40% 95%;
+    --theme-card-background: 0 0% 100%;
+    --theme-title: 188 40% 25%;
+  }
+
+  /* 紫色主题 */
+  [data-color-theme="purple"] {
+    --theme-primary: 260 25% 40%;
+    --theme-primary-foreground: 0 0% 98%;
+    --theme-ring: 260 25% 40%;
+    --theme-background: 260 25% 95%;
+    --theme-card-background: 0 0% 100%;
+    --theme-title: 260 25% 25%;
+  }
+
+  /* 橙色主题 */
+  [data-color-theme="orange"] {
+    --theme-primary: 35 90% 45%;
+    --theme-primary-foreground: 0 0% 98%;
+    --theme-ring: 35 90% 45%;
+    --theme-background: 35 90% 95%;
+    --theme-card-background: 0 0% 100%;
+    --theme-title: 35 90% 25%;
+  }
+
+  /* 粉色主题 */
+  [data-color-theme="pink"] {
+    --theme-primary: 350 60% 55%;
+    --theme-primary-foreground: 0 0% 98%;
+    --theme-ring: 350 60% 55%;
+    --theme-background: 350 60% 95%;
+    --theme-card-background: 0 0% 100%;
+    --theme-title: 350 60% 25%;
+  }
+
+  /* 深蓝主题 */
+  [data-color-theme="navy"] {
+    --theme-primary: 200 60% 20%;
+    --theme-primary-foreground: 0 0% 98%;
+    --theme-ring: 200 60% 20%;
+    --theme-background: 200 60% 95%;
+    --theme-card-background: 0 0% 100%;
+    --theme-title: 200 60% 25%;
   }
   .dark {
     --background: 0 0% 3.9%;
@@ -81,6 +149,74 @@ body {
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* 深色模式下的主题色变量 - 默认青色 */
+    --theme-primary: 188 40% 45%;
+    --theme-primary-foreground: 0 0% 98%;
+    --theme-ring: 188 40% 45%;
+    --theme-background: 0 0% 3.9%;
+    --theme-card-background: 0 0% 3.9%;
+    --theme-title: 188 40% 75%;
+  }
+
+  /* 深色模式下的绿色主题 */
+  .dark[data-color-theme="green"] {
+    --theme-primary: 142 25% 45%;
+    --theme-primary-foreground: 0 0% 98%;
+    --theme-ring: 142 25% 45%;
+    --theme-background: 0 0% 3.9%;
+    --theme-card-background: 0 0% 3.9%;
+    --theme-title: 142 25% 75%;
+  }
+
+  /* 深色模式下的青色主题 */
+  .dark[data-color-theme="cyan"] {
+    --theme-primary: 188 40% 45%;
+    --theme-primary-foreground: 0 0% 98%;
+    --theme-ring: 188 40% 45%;
+    --theme-background: 0 0% 3.9%;
+    --theme-card-background: 0 0% 3.9%;
+    --theme-title: 188 40% 75%;
+  }
+
+  /* 深色模式下的紫色主题 */
+  .dark[data-color-theme="purple"] {
+    --theme-primary: 260 25% 40%;
+    --theme-primary-foreground: 0 0% 98%;
+    --theme-ring: 260 25% 40%;
+    --theme-background: 0 0% 3.9%;
+    --theme-card-background: 0 0% 3.9%;
+    --theme-title: 260 25% 75%;
+  }
+
+  /* 深色模式下的橙色主题 */
+  .dark[data-color-theme="orange"] {
+    --theme-primary: 35 90% 45%;
+    --theme-primary-foreground: 0 0% 98%;
+    --theme-ring: 35 90% 45%;
+    --theme-background: 0 0% 3.9%;
+    --theme-card-background: 0 0% 3.9%;
+    --theme-title: 35 90% 75%;
+  }
+
+  /* 深色模式下的粉色主题 */
+  .dark[data-color-theme="pink"] {
+    --theme-primary: 350 60% 55%;
+    --theme-primary-foreground: 0 0% 98%;
+    --theme-ring: 350 60% 55%;
+    --theme-background: 0 0% 3.9%;
+    --theme-card-background: 0 0% 3.9%;
+    --theme-title: 350 60% 75%;
+  }
+
+  /* 深色模式下的深蓝主题 */
+  .dark[data-color-theme="navy"] {
+    --theme-primary: 200 60% 20%;
+    --theme-primary-foreground: 0 0% 98%;
+    --theme-ring: 200 60% 20%;
+    --theme-background: 0 0% 3.9%;
+    --theme-card-background: 0 0% 3.9%;
+    --theme-title: 200 60% 75%;
   }
 }
 

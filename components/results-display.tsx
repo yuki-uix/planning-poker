@@ -42,7 +42,7 @@ export function ResultsDisplay({ session, stats }: ResultsDisplayProps) {
       <div className="flex-1">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-title">
               <BarChart3 className="w-5 h-5" />
               {t.results.title}
             </CardTitle>
