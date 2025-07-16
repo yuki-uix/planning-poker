@@ -1,39 +1,13 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useLanguage } from "@/hooks/use-language";
-import {
-  ESTIMATION_TEMPLATES,
-  EstimationStats,
-  Session,
-  TemplateType,
-} from "@/types/estimation";
 import { BarChart3, Calculator } from "lucide-react";
+import type { ResultsDisplayProps } from "./types";
+import { useResultsDisplay } from "./useResultsDisplay";
 
-interface ResultsDisplayProps {
-  session: Session;
-  stats: EstimationStats;
-}
-
-export function ResultsDisplay({ session, stats }: ResultsDisplayProps) {
-  const { t } = useLanguage();
-
-  const selectedTemplate =
-    (session.template?.type as TemplateType) || "fibonacci";
-  const customCards = session.template?.customCards || "☕️,1,2,3,5,8,13";
-
-  // 获取当前估点卡片
-  const getCurrentEstimationCards = () => {
-    if (selectedTemplate === "custom") {
-      return customCards
-        .split(",")
-        .map((card) => card.trim())
-        .filter((card) => card.length > 0);
-    }
-    return [...ESTIMATION_TEMPLATES[selectedTemplate].cards];
-  };
-
-  const currentEstimationCards = getCurrentEstimationCards();
+export function ResultsDisplay(props: ResultsDisplayProps) {
+  const { t, currentEstimationCards, stats, session } =
+    useResultsDisplay(props);
 
   if (!session.revealed || !stats) return null;
 

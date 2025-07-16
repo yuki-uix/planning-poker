@@ -2,25 +2,12 @@
 
 import { Button } from "@/components/ui/button";
 import { Eye } from "lucide-react";
-import { useLanguage } from "@/hooks/use-language";
-import { Session } from "@/types/estimation";
+import { useControlButtons } from "./useControlButtons";
+import type { ControlButtonsProps } from "./types";
 
-interface ControlButtonsProps {
-  session: Session;
-  isHost: boolean;
-  allUsersVoted: boolean;
-  onRevealVotes: () => void;
-  onResetVotes: () => void;
-}
-
-export function ControlButtons({
-  session,
-  isHost,
-  allUsersVoted,
-  onRevealVotes,
-  onResetVotes,
-}: ControlButtonsProps) {
-  const { t } = useLanguage();
+export function ControlButtons(props: ControlButtonsProps) {
+  const { t, session, isHost, allUsersVoted, onRevealVotes, onResetVotes } =
+    useControlButtons(props);
 
   if (!isHost) return null;
 

@@ -17,49 +17,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useLanguage } from "@/hooks/use-language";
 import {
   ESTIMATION_TEMPLATES,
-  Session,
-  TemplateType,
+  TemplateType
 } from "@/types/estimation";
 import { Settings } from "lucide-react";
-import { useState } from "react";
+import type { TemplateSettingsProps } from "./types";
+import { useTemplateSettings } from "./useTemplateSettings";
 
-interface TemplateSettingsProps {
-  session: Session;
-  isHost: boolean;
-  onTemplateChange: (templateType: TemplateType) => void;
-  onCustomCardsChange: (customCards: string) => void;
-}
-
-export function TemplateSettings({
-  session,
-  isHost,
-  onTemplateChange,
-  onCustomCardsChange,
-}: TemplateSettingsProps) {
-  const { t } = useLanguage();
-  const [showTemplateSettings, setShowTemplateSettings] = useState(false);
+export function TemplateSettings(props: TemplateSettingsProps) {
+  const {
+    t,
+    showTemplateSettings,
+    setShowTemplateSettings,
+    selectedTemplate,
+    customCards,
+    currentEstimationCards,
+    isHost,
+    onTemplateChange,
+    onCustomCardsChange,
+  } = useTemplateSettings(props);
 
   if (!isHost) return null;
-
-  const selectedTemplate =
-    (session.template?.type as TemplateType) || "fibonacci";
-  const customCards = session.template?.customCards || "☕️,1,2,3,5,8,13";
-
-  // 获取当前估点卡片
-  const getCurrentEstimationCards = () => {
-    if (selectedTemplate === "custom") {
-      return customCards
-        .split(",")
-        .map((card) => card.trim())
-        .filter((card) => card.length > 0);
-    }
-    return [...ESTIMATION_TEMPLATES[selectedTemplate].cards];
-  };
-
-  const currentEstimationCards = getCurrentEstimationCards();
 
   return (
     <Card>

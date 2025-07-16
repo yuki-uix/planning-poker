@@ -2,26 +2,14 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Crown, User as UserIcon, EyeOff } from "lucide-react";
-import { useLanguage } from "@/hooks/use-language";
-import { Session, User } from "@/types/estimation";
+import { Crown, EyeOff, User as UserIcon } from "lucide-react";
+import type { UserStatusProps } from "./types";
+import { useUserStatus } from "./useUserStatus";
+import { User } from "@/types/estimation";
 
-interface UserStatusProps {
-  session: Session;
-  currentUser: string;
-}
-
-export function UserStatus({ session, currentUser }: UserStatusProps) {
-  const { t } = useLanguage();
-
-  // 分离已投票和未投票的用户
-  const votedUsers = session.users.filter(
-    (user) => user.hasVoted && (user.role === "attendance" || user.role === "host")
-  );
-  const notVotedUsers = session.users.filter(
-    (user) => !user.hasVoted && (user.role === "attendance" || user.role === "host")
-  );
-  const guestUsers = session.users.filter((user) => user.role === "guest");
+export function UserStatus(props: UserStatusProps) {
+  const { t, votedUsers, notVotedUsers, guestUsers, session, currentUser } =
+    useUserStatus(props);
 
   const renderUserCard = (user: User) => (
     <div
@@ -41,9 +29,7 @@ export function UserStatus({ session, currentUser }: UserStatusProps) {
       <div className="flex justify-center items-center gap-2">
         <Badge variant="outline" className="text-xs">
           {user.role === "host" && <Crown className="w-3 h-3 mr-1" />}
-          {user.role === "attendance" && (
-            <UserIcon className="w-3 h-3 mr-1" />
-          )}
+          {user.role === "attendance" && <UserIcon className="w-3 h-3 mr-1" />}
           {user.role === "guest" && <EyeOff className="w-3 h-3 mr-1" />}
           {t.main[user.role as keyof typeof t.main]}
         </Badge>

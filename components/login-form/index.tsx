@@ -12,32 +12,23 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useLanguage } from "@/hooks/use-language";
+import { useLoginForm } from "./useLoginForm";
+import type { LoginFormProps } from "./types";
 import { UserRole } from "@/lib/session-store";
 import { EyeOff, User } from "lucide-react";
 
-interface LoginFormProps {
-  sessionId?: string;
-  userName: string;
-  setUserName: (name: string) => void;
-  selectedRole: UserRole;
-  setSelectedRole: (role: UserRole) => void;
-  isLoading: boolean;
-  onCreateSession: () => void;
-  onJoinSession: () => void;
-}
-
-export function LoginForm({
-  sessionId,
-  userName,
-  setUserName,
-  selectedRole,
-  setSelectedRole,
-  isLoading,
-  onCreateSession,
-  onJoinSession,
-}: LoginFormProps) {
-  const { t } = useLanguage();
+export function LoginForm(props: LoginFormProps) {
+  const {
+    t,
+    sessionId,
+    userName,
+    setUserName,
+    selectedRole,
+    setSelectedRole,
+    isLoading,
+    onCreateSession,
+    onJoinSession,
+  } = useLoginForm(props);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -47,7 +38,9 @@ export function LoginForm({
             <div></div>
             <LanguageSwitcher />
           </div>
-          <CardTitle className="text-2xl font-bold text-title">{t.login.title}</CardTitle>
+          <CardTitle className="text-2xl font-bold text-title">
+            {t.login.title}
+          </CardTitle>
           <CardDescription>
             {sessionId ? t.login.joinSession : t.login.subtitle}
           </CardDescription>
