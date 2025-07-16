@@ -1,11 +1,12 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { useLanguage } from "@/hooks/use-language";
+import { useLanguageSwitcher } from "./useLanguageSwitcher";
+import type { LanguageSwitcherProps } from "./types";
 import { Languages } from "lucide-react";
 
-export function LanguageSwitcher() {
-  const { language, toggleLanguage } = useLanguage();
+export function LanguageSwitcher(props: LanguageSwitcherProps = {}) {
+  const { language, toggleLanguage } = useLanguageSwitcher(props);
 
   return (
     <Button

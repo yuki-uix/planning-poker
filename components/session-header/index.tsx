@@ -10,8 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useLanguage } from "@/hooks/use-language";
-import { Session } from "@/types/estimation";
+import { useSessionHeader } from "./useSessionHeader";
+import type { SessionHeaderProps } from "./types";
 import {
   Check,
   Crown,
@@ -24,29 +24,10 @@ import {
   WifiOff,
 } from "lucide-react";
 
-interface SessionHeaderProps {
-  session: Session;
-  sessionId: string;
-  userName: string;
-  currentUser: string;
-  isConnected: boolean;
-  copied: boolean;
-  onCopyShareLink: () => void;
-  onLogout: () => void;
-}
-
-export function SessionHeader({
-  session,
-  sessionId,
-  userName,
-  currentUser,
-  isConnected,
-  copied,
-  onCopyShareLink,
-  onLogout,
-}: SessionHeaderProps) {
-  const { t } = useLanguage();
-  const currentUserData = session.users.find((u) => u.id === currentUser);
+export function SessionHeader(props: SessionHeaderProps) {
+  const { t, currentUserData, isConnected, copied, session } =
+    useSessionHeader(props);
+  const { sessionId, userName, onCopyShareLink, onLogout } = props;
 
   return (
     <Card>
@@ -92,11 +73,10 @@ export function SessionHeader({
             </div>
           </div>
         </div>
-        
         {/* 第二行：操作按钮和设置 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-          <ThemeColorPicker compact />
+            <ThemeColorPicker compact />
           </div>
           <div className="flex items-center gap-2">
             <LanguageSwitcher />

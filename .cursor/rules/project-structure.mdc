@@ -1,0 +1,43 @@
+---
+description: project structure update or refactor
+alwaysApply: false
+---
+project should follow the structure:
+
+```
+components/
+├── [component-name]/
+│ ├── index.tsx # focus on render
+│ ├── use[ComponentName].ts # logic hook
+│ └── types.ts # types
+ui/ # common ui
+hooks/ # common hooks
+```
+
+1. for index.tsx(render)
+    - only contains UI render logic
+    - do not keep status management
+2. for use[CompoentName].ts (logic hooks)
+    - execute business logic
+    - manage status
+    - provide function for event
+    - return props index needed
+
+```Example
+// components/voting-cards/index.tsx
+export function VotingCards(props: VotingCardsProps) {
+  const { cards, selectedVote, onVote, canVote } = useVotingCards(props);
+  
+  return (
+    <div>
+      {/* purely render */}
+    </div>
+  );
+}
+
+// components/voting-cards/useVotingCards.ts
+export function useVotingCards(props: VotingCardsProps) {
+  // all calculate logic
+  return { cards, selectedVote, onVote, canVote };
+}
+```

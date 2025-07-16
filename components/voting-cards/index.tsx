@@ -9,47 +9,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EyeOff } from "lucide-react";
-import { useLanguage } from "@/hooks/use-language";
-import {
-  Session,
-  ESTIMATION_TEMPLATES,
-  TemplateType,
-} from "@/types/estimation";
+import { useVotingCards } from "./useVotingCards";
+import type { VotingCardsProps } from "./types";
 
-interface VotingCardsProps {
-  session: Session;
-  currentUser: string;
-  selectedVote: string | null;
-  canVote: boolean;
-  onCastVote: (vote: string) => void;
-}
-
-export function VotingCards({
-  session,
-  currentUser,
-  selectedVote,
-  canVote,
-  onCastVote,
-}: VotingCardsProps) {
-  const { t } = useLanguage();
-  const currentUserData = session.users.find((u) => u.id === currentUser);
-
-  const selectedTemplate =
-    (session.template?.type as TemplateType) || "fibonacci";
-  const customCards = session.template?.customCards || "☕️,1,2,3,5,8,13";
-
-  // 获取当前估点卡片
-  const getCurrentEstimationCards = () => {
-    if (selectedTemplate === "custom") {
-      return customCards
-        .split(",")
-        .map((card) => card.trim())
-        .filter((card) => card.length > 0);
-    }
-    return [...ESTIMATION_TEMPLATES[selectedTemplate].cards];
-  };
-
-  const currentEstimationCards = getCurrentEstimationCards();
+export function VotingCards(props: VotingCardsProps) {
+  const { t, currentUserData, currentEstimationCards } = useVotingCards(props);
+  const { selectedVote, onCastVote, canVote, session } = props;
 
   // 如果是guest用户，显示投票卡片但不能点击
   if (currentUserData?.role === "guest") {
@@ -61,7 +26,7 @@ export function VotingCards({
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-4 md:grid-cols-7 gap-4">
-            {currentEstimationCards.map((card) => (
+            {currentEstimationCards.map((card: string) => (
               <Button
                 key={card}
                 variant="outline"
@@ -87,14 +52,14 @@ export function VotingCards({
   }
 
   return (
-          <Card>
-        <CardHeader>
-          <CardTitle className="text-title">{t.voting.title}</CardTitle>
-          <CardDescription>{t.voting.subtitle}</CardDescription>
-        </CardHeader>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-title">{t.voting.title}</CardTitle>
+        <CardDescription>{t.voting.subtitle}</CardDescription>
+      </CardHeader>
       <CardContent>
         <div className="grid grid-cols-4 md:grid-cols-7 gap-4">
-          {currentEstimationCards.map((card) => (
+          {currentEstimationCards.map((card: string) => (
             <Button
               key={card}
               variant={selectedVote === card ? "default" : "outline"}

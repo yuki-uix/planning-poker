@@ -6,20 +6,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useLanguage } from "@/hooks/use-language";
+import type { SessionErrorModalProps } from "./types";
+import { useSessionErrorModal } from "./useSessionErrorModal";
 
-interface SessionErrorModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onBackToHost: () => void;
-}
-
-export function SessionErrorModal({
-  isOpen,
-  onClose,
-  onBackToHost,
-}: SessionErrorModalProps) {
-  const { t } = useLanguage();
+export function SessionErrorModal(props: SessionErrorModalProps) {
+  const { t, isOpen, onClose, onBackToHost } = useSessionErrorModal(props);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -36,15 +27,11 @@ export function SessionErrorModal({
           <Button onClick={onBackToHost} className="w-full">
             {t.errors.sessionNotFound.backToHostButton}
           </Button>
-          <Button
-            variant="outline"
-            onClick={onClose}
-            className="w-full"
-          >
+          <Button variant="outline" onClick={onClose} className="w-full">
             {t.errors.sessionNotFound.closeButton}
           </Button>
         </div>
       </DialogContent>
     </Dialog>
   );
-} 
+}
