@@ -1,0 +1,10 @@
+---
+description: refactor single file
+globs:
+alwaysApply: false
+---
+
+1. The number of parameters of a function method or hook function should not exceed 4
+2. A single file should focus on a single function
+3. Avoid circular dependencies
+4. Reduce unnecessary performance loss
