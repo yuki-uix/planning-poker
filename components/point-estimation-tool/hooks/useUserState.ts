@@ -16,6 +16,8 @@ export interface UserState {
   selectedVote: string | null;
   isRestoring: boolean;
   isJoined: boolean;
+  setCurrentUser: (user: string) => void;
+  setSessionId: (sessionId: string) => void;
 }
 
 export interface UserStateHandlers {
@@ -129,7 +131,9 @@ export function useUserState(): UserState & UserStateHandlers {
     setSelectedRole,
     setSelectedVote,
     setIsJoined,
+    setCurrentUser, // 新增导出
+    setSessionId, // 新增导出
     restoreUserState,
     clearUserState,
   };
-} 
+}

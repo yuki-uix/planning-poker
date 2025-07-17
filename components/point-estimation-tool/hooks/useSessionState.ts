@@ -36,9 +36,11 @@ export function useSessionState(
   }, [isJoined, setIsJoined]);
 
   const pollSession = useCallback(async () => {
+    console.log("pollSession", { sessionId, currentUser }); // 调试日志
     if (!sessionId || !currentUser) return;
     try {
       const result = await getSessionData(sessionId);
+      console.log("getSessionData result", result); // 调试日志
       if (result.success && result.session) {
         setSession(result.session);
         setIsConnected(true);
@@ -84,4 +86,4 @@ export function useSessionState(
     pollSession,
     sendHeartbeat,
   };
-} 
+}
