@@ -54,9 +54,8 @@ export function usePointEstimationTool(): PointEstimationToolState &
         userId
       );
       if (result) {
-        userState.setCurrentUser(userId); // 新增
-        // 需要从 persistence 里获取 sessionId
-        // 由于 handleCreateSession 返回 boolean，需从 getUserData 取 sessionId
+        userState.setCurrentUser(userId);
+        // 从 getUserData 获取 sessionId
         const userData = await import("@/lib/persistence").then((m) =>
           m.getUserData()
         );
@@ -94,8 +93,8 @@ export function usePointEstimationTool(): PointEstimationToolState &
         userId
       );
       if (result) {
-        userState.setCurrentUser(userId); // 新增
-        userState.setSessionId(userState.sessionId); // 保证 sessionId 已设置
+        userState.setCurrentUser(userId);
+        userState.setSessionId(userState.sessionId);
         userState.setIsJoined(true);
         sessionState.setIsConnected(true);
       } else {
