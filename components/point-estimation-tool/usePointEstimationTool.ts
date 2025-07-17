@@ -14,7 +14,9 @@ import type {
 
 export function usePointEstimationTool(): PointEstimationToolState &
   PointEstimationToolHandlers & {
-    stats: ReturnType<typeof import("@/lib/estimation-utils").calculateStats> | null;
+    stats: ReturnType<
+      typeof import("@/lib/estimation-utils").calculateStats
+    > | null;
     allUsersVoted: boolean;
     isHost: boolean;
     canVote: boolean;
@@ -31,7 +33,10 @@ export function usePointEstimationTool(): PointEstimationToolState &
   );
   const sessionActions = useSessionActions();
   const uiState = useUIState();
-  const computedValues = useComputedValues(sessionState.session, userState.currentUser);
+  const computedValues = useComputedValues(
+    sessionState.session,
+    userState.currentUser
+  );
 
   // 更新URL
   useEffect(() => {
@@ -44,8 +49,20 @@ export function usePointEstimationTool(): PointEstimationToolState &
     sessionState.setIsLoading(true);
     const userId = `${userState.userName}-${Date.now()}`;
     try {
-      const success = await sessionActions.handleCreateSession(userState.userName, userId);
-      if (success) {
+      const result = await sessionActions.handleCreateSession(
+        userState.userName,
+        userId
+      );
+      if (result) {
+        userState.setCurrentUser(userId); // 新增
+        // 需要从 persistence 里获取 sessionId
+        // 由于 handleCreateSession 返回 boolean，需从 getUserData 取 sessionId
+        const userData = await import("@/lib/persistence").then((m) =>
+          m.getUserData()
+        );
+        if (userData) {
+          userState.setSessionId(userData.sessionId);
+        }
         userState.setIsJoined(true);
         sessionState.setIsConnected(true);
       } else {
@@ -56,7 +73,13 @@ export function usePointEstimationTool(): PointEstimationToolState &
     } finally {
       sessionState.setIsLoading(false);
     }
-  }, [userState.userName, userState.setIsJoined, sessionState, sessionActions]);
+  }, [
+    userState.userName,
+    userState.setIsJoined,
+    sessionState,
+    sessionActions,
+    userState,
+  ]);
 
   // 处理加入会话
   const handleJoinSession = useCallback(async () => {
@@ -64,13 +87,15 @@ export function usePointEstimationTool(): PointEstimationToolState &
     sessionState.setIsLoading(true);
     const userId = `${userState.userName}-${Date.now()}`;
     try {
-      const success = await sessionActions.handleJoinSession(
+      const result = await sessionActions.handleJoinSession(
         userState.userName,
         userState.sessionId,
         userState.selectedRole,
         userId
       );
-      if (success) {
+      if (result) {
+        userState.setCurrentUser(userId); // 新增
+        userState.setSessionId(userState.sessionId); // 保证 sessionId 已设置
         userState.setIsJoined(true);
         sessionState.setIsConnected(true);
       } else {
@@ -83,20 +108,37 @@ export function usePointEstimationTool(): PointEstimationToolState &
     } finally {
       sessionState.setIsLoading(false);
     }
-  }, [userState.userName, userState.sessionId, userState.selectedRole, userState.setIsJoined, sessionState, sessionActions, uiState]);
+  }, [
+    userState.userName,
+    userState.sessionId,
+    userState.selectedRole,
+    userState.setIsJoined,
+    sessionState,
+    sessionActions,
+    uiState,
+    userState,
+  ]);
 
   // 处理投票
-  const handleCastVote = useCallback(async (vote: string) => {
-    if (!sessionState.session || !userState.currentUser || !computedValues.canVote) return;
-    userState.setSelectedVote(vote);
-    await sessionActions.handleCastVote(
-      userState.sessionId,
-      userState.currentUser,
-      vote,
-      sessionState.session,
-      computedValues.canVote
-    );
-  }, [sessionState.session, userState, sessionActions, computedValues.canVote]);
+  const handleCastVote = useCallback(
+    async (vote: string) => {
+      if (
+        !sessionState.session ||
+        !userState.currentUser ||
+        !computedValues.canVote
+      )
+        return;
+      userState.setSelectedVote(vote);
+      await sessionActions.handleCastVote(
+        userState.sessionId,
+        userState.currentUser,
+        vote,
+        sessionState.session,
+        computedValues.canVote
+      );
+    },
+    [sessionState.session, userState, sessionActions, computedValues.canVote]
+  );
 
   // 处理显示投票
   const handleRevealVotes = useCallback(async () => {
@@ -123,32 +165,38 @@ export function usePointEstimationTool(): PointEstimationToolState &
   }, [sessionState.session, userState, sessionActions, computedValues.isHost]);
 
   // 处理模板变更
-  const handleTemplateChange = useCallback(async (templateType: TemplateType) => {
-    if (!sessionState.session || !computedValues.isHost) return;
-    await sessionActions.handleTemplateChange(
-      userState.sessionId,
-      userState.currentUser,
-      sessionState.session,
-      computedValues.isHost,
-      templateType,
-      userState.setSelectedVote,
-      sessionState.pollSession
-    );
-  }, [sessionState.session, userState, sessionActions, computedValues.isHost]);
+  const handleTemplateChange = useCallback(
+    async (templateType: TemplateType) => {
+      if (!sessionState.session || !computedValues.isHost) return;
+      await sessionActions.handleTemplateChange(
+        userState.sessionId,
+        userState.currentUser,
+        sessionState.session,
+        computedValues.isHost,
+        templateType,
+        userState.setSelectedVote,
+        sessionState.pollSession
+      );
+    },
+    [sessionState.session, userState, sessionActions, computedValues.isHost]
+  );
 
   // 处理自定义卡片变更
-  const handleCustomCardsChange = useCallback(async (newCustomCards: string) => {
-    if (!sessionState.session || !computedValues.isHost) return;
-    await sessionActions.handleCustomCardsChange(
-      userState.sessionId,
-      userState.currentUser,
-      sessionState.session,
-      computedValues.isHost,
-      newCustomCards,
-      userState.setSelectedVote,
-      sessionState.pollSession
-    );
-  }, [sessionState.session, userState, sessionActions, computedValues.isHost]);
+  const handleCustomCardsChange = useCallback(
+    async (newCustomCards: string) => {
+      if (!sessionState.session || !computedValues.isHost) return;
+      await sessionActions.handleCustomCardsChange(
+        userState.sessionId,
+        userState.currentUser,
+        sessionState.session,
+        computedValues.isHost,
+        newCustomCards,
+        userState.setSelectedVote,
+        sessionState.pollSession
+      );
+    },
+    [sessionState.session, userState, sessionActions, computedValues.isHost]
+  );
 
   // 处理登出
   const handleLogout = useCallback(async () => {
@@ -175,7 +223,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
     uiState.clearURL();
   }, [userState, sessionState, uiState]);
 
-  return {
+  const resultObj = {
     currentUser: userState.currentUser,
     userName: userState.userName,
     sessionId: userState.sessionId,
@@ -200,11 +248,19 @@ export function usePointEstimationTool(): PointEstimationToolState &
     handleCustomCardsChange,
     handleLogout,
     handleBackToHost,
-    copyShareLink: () => uiState.copyShareLink(userState.sessionId),
+    copyShareLink: uiState.copyShareLink,
     stats: computedValues.stats,
     allUsersVoted: computedValues.allUsersVoted,
     isHost: computedValues.isHost,
     canVote: computedValues.canVote,
     currentUserData: computedValues.currentUserData,
   };
+  console.log("usePointEstimationTool", {
+    session: sessionState.session,
+    isJoined: sessionState.isJoined,
+    isRestoring: userState.isRestoring,
+    currentUser: userState.currentUser,
+    sessionId: userState.sessionId,
+  });
+  return resultObj;
 }

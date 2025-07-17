@@ -1,19 +1,19 @@
-import { WebSocketServer, WebSocket } from 'ws';
-import { createServer } from 'http';
-import { redisSessionStore } from './lib/redis-session-store';
-import { connectionPool } from './lib/connection-pool';
-import { heartbeatManager } from './lib/heartbeat-manager';
+import { WebSocketServer, WebSocket } from "ws";
+import { createServer } from "http";
+import { redisSessionStore } from "./lib/redis-session-store";
+import { connectionPool } from "./lib/connection-pool";
+import { heartbeatManager } from "./lib/heartbeat-manager";
 
 const PORT = process.env.PORT || 3001;
 
 // 创建 HTTP 服务器
 const server = createServer((req, res) => {
-  if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('healthy');
+  if (req.url === "/health") {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("healthy");
     return;
   }
-  
+
   res.writeHead(404);
   res.end();
 });
@@ -22,7 +22,9 @@ const server = createServer((req, res) => {
 const wss = new WebSocketServer({ server });
 
 // 最大连接数限制
-const MAX_CONNECTIONS_PER_SESSION = parseInt(process.env.MAX_CONNECTIONS_PER_SESSION || '20');
+const MAX_CONNECTIONS_PER_SESSION = parseInt(
+  process.env.MAX_CONNECTIONS_PER_SESSION || "20"
+);
 
 // 生成连接ID
 function generateConnectionId(): string {
@@ -31,7 +33,7 @@ function generateConnectionId(): string {
 
 // WebSocket消息类型定义
 interface WebSocketMessage {
-  type: 'heartbeat' | 'vote' | 'reveal' | 'reset' | 'template_update';
+  type: "heartbeat" | "vote" | "reveal" | "reset" | "template_update";
   sessionId: string;
   userId: string;
   data?: {
@@ -42,24 +44,27 @@ interface WebSocketMessage {
   timestamp?: number;
 }
 
-wss.on('connection', async (ws: WebSocket, request) => {
-  console.log('WebSocket client connected');
+wss.on("connection", async (ws: WebSocket, request) => {
+  console.log("WebSocket client connected");
 
   // 解析连接参数
   const url = new URL(request.url!, `http://${request.headers.host}`);
-  const sessionId = url.searchParams.get('sessionId');
-  const userId = url.searchParams.get('userId');
+  const sessionId = url.searchParams.get("sessionId");
+  const userId = url.searchParams.get("userId");
 
   if (!sessionId || !userId) {
-    ws.close(1008, 'Missing sessionId or userId');
+    ws.close(1008, "Missing sessionId or userId");
     return;
   }
 
   // 检查连接数量限制
-  const currentConnections = connectionPool.getSessionConnectionCount(sessionId);
+  const currentConnections =
+    connectionPool.getSessionConnectionCount(sessionId);
   if (currentConnections >= MAX_CONNECTIONS_PER_SESSION) {
-    console.warn(`Session ${sessionId} connection limit reached (${currentConnections}/${MAX_CONNECTIONS_PER_SESSION})`);
-    ws.close(1013, 'Session connection limit reached');
+    console.warn(
+      `Session ${sessionId} connection limit reached (${currentConnections}/${MAX_CONNECTIONS_PER_SESSION})`
+    );
+    ws.close(1013, "Session connection limit reached");
     return;
   }
 
@@ -70,43 +75,79 @@ wss.on('connection', async (ws: WebSocket, request) => {
   const added = connectionPool.addConnection(sessionId, ws, {
     sessionId,
     userId,
-    connectionId
+    connectionId,
   });
 
   if (!added) {
-    ws.close(1013, 'Connection pool is full');
+    ws.close(1013, "Connection pool is full");
     return;
   }
 
   // 设置连接元数据
-  (ws as WebSocket & { sessionId: string; userId: string; connectionId: string }).sessionId = sessionId;
-  (ws as WebSocket & { sessionId: string; userId: string; connectionId: string }).userId = userId;
-  (ws as WebSocket & { sessionId: string; userId: string; connectionId: string }).connectionId = connectionId;
+  (
+    ws as WebSocket & {
+      sessionId: string;
+      userId: string;
+      connectionId: string;
+    }
+  ).sessionId = sessionId;
+  (
+    ws as WebSocket & {
+      sessionId: string;
+      userId: string;
+      connectionId: string;
+    }
+  ).userId = userId;
+  (
+    ws as WebSocket & {
+      sessionId: string;
+      userId: string;
+      connectionId: string;
+    }
+  ).connectionId = connectionId;
 
   // 注册到Redis
   try {
     await redisSessionStore.addConnection(sessionId, userId, connectionId);
   } catch (error) {
-    console.error('Failed to register connection in Redis:', error);
+    console.error("Failed to register connection in Redis:", error);
   }
 
   // 开始心跳
   heartbeatManager.startHeartbeat(userId, ws);
 
-  ws.on('message', async (data: Buffer) => {
+  ws.on("message", async (data: Buffer) => {
     try {
       const message = JSON.parse(data.toString());
       await handleWebSocketMessage(ws, message);
     } catch (error) {
-      console.error('Failed to parse WebSocket message:', error);
+      console.error("Failed to parse WebSocket message:", error);
     }
   });
 
-  ws.on('close', async () => {
-    console.log('WebSocket client disconnected');
-    const sessionId = (ws as WebSocket & { sessionId: string; userId: string; connectionId: string }).sessionId;
-    const userId = (ws as WebSocket & { sessionId: string; userId: string; connectionId: string }).userId;
-    const connectionId = (ws as WebSocket & { sessionId: string; userId: string; connectionId: string }).connectionId;
+  ws.on("close", async () => {
+    console.log("WebSocket client disconnected");
+    const sessionId = (
+      ws as WebSocket & {
+        sessionId: string;
+        userId: string;
+        connectionId: string;
+      }
+    ).sessionId;
+    const userId = (
+      ws as WebSocket & {
+        sessionId: string;
+        userId: string;
+        connectionId: string;
+      }
+    ).userId;
+    const connectionId = (
+      ws as WebSocket & {
+        sessionId: string;
+        userId: string;
+        connectionId: string;
+      }
+    ).connectionId;
 
     // 停止心跳
     heartbeatManager.stopHeartbeat(userId);
@@ -119,153 +160,115 @@ wss.on('connection', async (ws: WebSocket, request) => {
     // 从Redis移除
     if (sessionId && userId && connectionId) {
       try {
-        await redisSessionStore.removeConnection(sessionId, userId, connectionId);
+        await redisSessionStore.removeConnection(
+          sessionId,
+          userId,
+          connectionId
+        );
       } catch (error) {
-        console.error('Failed to remove connection from Redis:', error);
+        console.error("Failed to remove connection from Redis:", error);
       }
     }
   });
 
-  ws.on('error', (error: Error) => {
-    console.error('WebSocket error:', error);
+  ws.on("error", (error: Error) => {
+    console.error("WebSocket error:", error);
   });
 });
 
 // 处理WebSocket消息
-async function handleWebSocketMessage(ws: WebSocket, message: WebSocketMessage) {
-  const sessionId = (ws as WebSocket & { sessionId: string; userId: string; connectionId: string }).sessionId;
-  const userId = (ws as WebSocket & { sessionId: string; userId: string; connectionId: string }).userId;
+async function handleWebSocketMessage(
+  ws: WebSocket,
+  message: WebSocketMessage
+) {
+  const sessionId = (
+    ws as WebSocket & {
+      sessionId: string;
+      userId: string;
+      connectionId: string;
+    }
+  ).sessionId;
+  const userId = (
+    ws as WebSocket & {
+      sessionId: string;
+      userId: string;
+      connectionId: string;
+    }
+  ).userId;
 
   switch (message.type) {
-    case 'heartbeat':
+    case "heartbeat":
       // 处理心跳
       heartbeatManager.handleHeartbeatResponse(userId);
       await broadcastToSession(sessionId, {
-        type: 'heartbeat_ack',
+        type: "heartbeat_ack",
         sessionId,
         userId,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
       break;
 
-    case 'vote':
+    case "vote":
       // 处理投票
       if (message.data?.vote) {
         await handleVote(sessionId, userId, message.data.vote);
       }
       break;
 
-    case 'reveal':
+    case "reveal":
       // 处理显示投票
       await handleReveal(sessionId, userId);
       break;
 
-    case 'reset':
+    case "reset":
       // 处理重置投票
       await handleReset(sessionId, userId);
       break;
 
-    case 'template_update':
+    case "template_update":
       // 处理模板更新
       if (message.data?.type) {
         await handleTemplateUpdate(sessionId, userId, {
           type: message.data.type,
-          customCards: message.data.customCards
+          customCards: message.data.customCards,
         });
       }
       break;
 
     default:
-      console.warn('Unknown message type:', message.type);
+      console.warn("Unknown message type:", message.type);
   }
 }
 
 // 处理投票
 async function handleVote(sessionId: string, userId: string, vote: string) {
   try {
-    const session = await redisSessionStore.updateUserVote(sessionId, userId, vote);
-    
+    const session = await redisSessionStore.updateUserVote(
+      sessionId,
+      userId,
+      vote
+    );
+
     if (session) {
       await broadcastToSession(sessionId, {
-        type: 'session_update',
+        type: "session_update",
         sessionId,
         data: session,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
   } catch (error) {
-    console.error('Failed to handle vote:', error);
+    console.error("Failed to handle vote:", error);
   }
 }
 
 // 处理显示投票
 async function handleReveal(sessionId: string, userId: string) {
   try {
-    const session = await redisSessionStore.revealVotes(sessionId, userId);
-    
-    if (session) {
-      await broadcastToSession(sessionId, {
-        type: 'session_update',
-        sessionId,
-        data: session,
-        timestamp: Date.now()
-      });
-    }
-  } catch (error) {
-    console.error('Failed to handle reveal:', error);
-  }
-}
-
-// 处理重置投票
-async function handleReset(sessionId: string, userId: string) {
-  try {
-    const session = await redisSessionStore.resetVotes(sessionId, userId);
-    
-    if (session) {
-      await broadcastToSession(sessionId, {
-        type: 'session_update',
-        sessionId,
-        data: session,
-        timestamp: Date.now()
-      });
-    }
-  } catch (error) {
-    console.error('Failed to handle reset:', error);
-  }
-}
-
-// 处理模板更新
-async function handleTemplateUpdate(sessionId: string, userId: string, templateData: { type: string; customCards?: string }) {
-  try {
-    const session = await redisSessionStore.updateTemplate(sessionId, userId, templateData);
-    
-    if (session) {
-      await broadcastToSession(sessionId, {
-        type: 'session_update',
-        sessionId,
-        data: session,
-        timestamp: Date.now()
-      });
-    }
-  } catch (error) {
-    console.error('Failed to handle template update:', error);
-  }
-}
-
-// 广播消息到会话中的所有用户
-async function broadcastToSession(sessionId: string, message: Record<string, unknown>) {
-  try {
-    // 使用连接池广播
-    await connectionPool.broadcastToSession(sessionId, message);
-  } catch (error) {
-    console.error('Failed to broadcast to session:', error);
-  }
-}
-
-// 启动服务器
-server.listen(PORT, () => {
-  console.log(`WebSocket server running on port ${PORT}`);
-}); 
+    const session = await redisSessionStore.revealSessionVotes(
+      sessionId,
+      userId
+    );
 
     if (session) {
       await broadcastToSession(sessionId, {
@@ -283,7 +286,10 @@ server.listen(PORT, () => {
 // 处理重置投票
 async function handleReset(sessionId: string, userId: string) {
   try {
-    const session = await redisSessionStore.resetVotes(sessionId, userId);
+    const session = await redisSessionStore.resetSessionVotes(
+      sessionId,
+      userId
+    );
 
     if (session) {
       await broadcastToSession(sessionId, {
@@ -305,10 +311,11 @@ async function handleTemplateUpdate(
   templateData: { type: string; customCards?: string }
 ) {
   try {
-    const session = await redisSessionStore.updateTemplate(
+    const session = await redisSessionStore.updateSessionTemplate(
       sessionId,
       userId,
-      templateData
+      templateData.type,
+      templateData.customCards
     );
 
     if (session) {
