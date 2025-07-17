@@ -1,9 +1,6 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:7-alpine
-    container_name: planning-poker-redis
     ports:
       - "6379:6379"
     volumes:
@@ -22,9 +19,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.websocket
-    container_name: planning-poker-websocket
-    ports:
-      - "3001:3001"
+    # 移除端口映射，让 nginx 通过内部网络访问
+    # ports:
+    #   - "3001:3001"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -48,10 +45,10 @@ services:
       resources:
         limits:
           memory: 1G
-          cpus: '0.5'
+          cpus: "0.5"
         reservations:
           memory: 512M
-          cpus: '0.25'
+          cpus: "0.25"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
       interval: 30s
@@ -62,11 +59,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: planning-poker-frontend
     ports:
       - "3000:3000"
     environment:
-      - WEBSOCKET_URL=ws://localhost:3001
+      - WEBSOCKET_URL=ws://websocket-service:3001
       - NEXT_PUBLIC_WEBSOCKET_URL=ws://localhost:3001
       - NODE_ENV=production
     depends_on:
@@ -76,20 +72,21 @@ services:
       resources:
         limits:
           memory: 512M
-          cpus: '0.25'
+          cpus: "0.25"
         reservations:
           memory: 256M
-          cpus: '0.1'
+          cpus: "0.1"
 
   nginx:
     image: nginx:alpine
-    container_name: planning-poker-nginx
     ports:
       - "80:80"
-      - "443:443"
+      # 移除 443 端口，因为暂时不需要 HTTPS
+      # - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
+      # 移除 ssl 目录挂载
+      # - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - frontend
       - websocket-service
@@ -97,4 +94,4 @@ services:
 
 volumes:
   redis_data:
-    driver: local 
+    driver: local
