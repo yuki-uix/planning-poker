@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: planning-poker-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    environment:
+      - REDIS_PASSWORD=
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  websocket-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.websocket
+    container_name: planning-poker-websocket
+    ports:
+      - "3001:3001"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - MAX_CONNECTIONS_PER_SESSION=20
+      - HEARTBEAT_INTERVAL=25000
+      - HEARTBEAT_TIMEOUT=35000
+      - MAX_MISSED_BEATS=2
+      - CONNECTION_POOL_SIZE=50
+      - HEALTH_CHECK_INTERVAL=30000
+      - BATCH_INTERVAL=100
+      - ENABLE_COMPRESSION=true
+      - COMPRESSION_THRESHOLD=1024
+      - NODE_ENV=production
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: planning-poker-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - WEBSOCKET_URL=ws://localhost:3001
+      - NEXT_PUBLIC_WEBSOCKET_URL=ws://localhost:3001
+      - NODE_ENV=production
+    depends_on:
+      - websocket-service
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+  nginx:
+    image: nginx:alpine
+    container_name: planning-poker-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - websocket-service
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+    driver: local 

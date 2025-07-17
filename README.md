@@ -10,7 +10,8 @@ A real-time collaborative point estimation tool for agile teams, supporting plan
 
 ### Features
 
-- **Real-time Collaboration**: Multiple users can join sessions simultaneously
+- **High-Performance Real-time Collaboration**: Supports 12+ users simultaneously with optimized WebSocket connections
+- **Distributed Architecture**: Redis-based session storage for high availability and scalability
 - **Role-based Access Control**: Three distinct roles with different permissions
   - **Host**: Create sessions, manage templates, control voting flow
   - **Attendance**: Join sessions and participate in voting
@@ -20,13 +21,19 @@ A real-time collaborative point estimation tool for agile teams, supporting plan
 - **Theme Color Customization**: Four beautiful theme colors to choose from
 - **Responsive Design**: Works on desktop and mobile devices
 - **Real-time Updates**: Live session updates and user status
+- **Connection Pool Management**: Intelligent connection pooling with health checks
+- **Message Optimization**: Compression and batching for improved performance
+- **Load Balancing**: Nginx-based load balancing for horizontal scaling
+- **Performance Monitoring**: Real-time statistics and performance metrics
 
 ### Tech Stack
 
 - **Frontend**: Next.js 15, React, TypeScript
 - **Styling**: Tailwind CSS, shadcn/ui components
-- **State Management**: Server-side session storage
-- **Real-time**: Polling-based updates
+- **State Management**: Redis distributed storage
+- **Real-time**: WebSocket + HTTP hybrid connection
+- **Backend**: Node.js, Redis, WebSocket
+- **Deployment**: Docker, Nginx, Load Balancing
 
 ### Getting Started
 
@@ -34,6 +41,8 @@ A real-time collaborative point estimation tool for agile teams, supporting plan
 
 - Node.js 18+
 - npm or yarn
+- Redis (for production)
+- Docker (optional, for containerized deployment)
 
 #### Installation
 
@@ -57,6 +66,21 @@ npm run dev
 ```
 
 4. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+#### Production Deployment
+
+For production deployment with support for 12+ concurrent users:
+
+```bash
+# Using Docker Compose
+docker-compose up -d
+
+# Or manual deployment
+npm run build
+npm start
+```
+
+See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for detailed deployment instructions.
 
 #### Usage
 
