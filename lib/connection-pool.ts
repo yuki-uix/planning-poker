@@ -6,6 +6,11 @@ export interface ConnectionMetadata {
   connectionId: string;
   connectedAt: number;
   lastHeartbeat: number;
+  quality: {
+    latency: number;
+    packetLoss: number;
+    stability: number;
+  };
 }
 
 export class ConnectionPool {
@@ -15,6 +20,7 @@ export class ConnectionPool {
   private healthCheckInterval: number;
   private heartbeatTimeout: number;
   private healthCheckTimer: NodeJS.Timeout | null = null;
+  private qualityCheckTimer: NodeJS.Timeout | null = null;
 
   constructor(options: {
     maxPoolSize?: number;
@@ -22,13 +28,14 @@ export class ConnectionPool {
     heartbeatTimeout?: number;
   } = {}) {
     this.maxPoolSize = options.maxPoolSize || 50;
-    this.healthCheckInterval = options.healthCheckInterval || 30000; // 30秒
-    this.heartbeatTimeout = options.heartbeatTimeout || 35000; // 35秒
+    this.healthCheckInterval = options.healthCheckInterval || 15000; // 15秒（更频繁）
+    this.heartbeatTimeout = options.heartbeatTimeout || 45000; // 45秒（更宽松）
     this.startHealthCheck();
+    this.startQualityCheck();
   }
 
   // 添加连接到池
-  addConnection(sessionId: string, ws: WebSocket, metadata: Omit<ConnectionMetadata, 'connectedAt' | 'lastHeartbeat'>): boolean {
+  addConnection(sessionId: string, ws: WebSocket, metadata: Omit<ConnectionMetadata, 'connectedAt' | 'lastHeartbeat' | 'quality'>): boolean {
     if (!this.pools.has(sessionId)) {
       this.pools.set(sessionId, new Set());
     }
@@ -44,6 +51,11 @@ export class ConnectionPool {
       ...metadata,
       connectedAt: Date.now(),
       lastHeartbeat: Date.now(),
+      quality: {
+        latency: 0,
+        packetLoss: 0,
+        stability: 1
+      }
     });
 
     console.log(`Added connection to session ${sessionId}, pool size: ${pool.size}`);
@@ -91,6 +103,14 @@ export class ConnectionPool {
     }
   }
 
+  // 更新连接质量
+  updateConnectionQuality(ws: WebSocket, quality: Partial<ConnectionMetadata['quality']>): void {
+    const metadata = this.metadata.get(ws);
+    if (metadata) {
+      metadata.quality = { ...metadata.quality, ...quality };
+    }
+  }
+
   // 广播消息到会话
   broadcastToSession(sessionId: string, message: Record<string, unknown>): Promise<void> {
     return new Promise((resolve) => {
@@ -110,8 +130,12 @@ export class ConnectionPool {
             if (error) {
               console.error('Failed to send message:', error);
               errorCount++;
+              // 更新连接质量
+              this.updateConnectionQuality(ws, { stability: 0.5 });
             } else {
               sentCount++;
+              // 更新连接质量
+              this.updateConnectionQuality(ws, { stability: 1 });
             }
 
             if (sentCount + errorCount === connections.length) {
@@ -137,8 +161,10 @@ export class ConnectionPool {
           ws.send(JSON.stringify(message), (error) => {
             if (error) {
               console.error(`Failed to send message to user ${userId}:`, error);
+              this.updateConnectionQuality(ws, { stability: 0.5 });
               resolve(false);
             } else {
+              this.updateConnectionQuality(ws, { stability: 1 });
               resolve(true);
             }
           });
@@ -154,6 +180,13 @@ export class ConnectionPool {
     this.healthCheckTimer = setInterval(() => {
       this.performHealthCheck();
     }, this.healthCheckInterval);
+  }
+
+  // 质量检查，监控连接质量
+  private startQualityCheck(): void {
+    this.qualityCheckTimer = setInterval(() => {
+      this.performQualityCheck();
+    }, 30000); // 30秒检查一次质量
   }
 
   private performHealthCheck(): void {
@@ -199,18 +232,77 @@ export class ConnectionPool {
     }
   }
 
+  private performQualityCheck(): void {
+    this.pools.forEach((pool, sessionId) => {
+      const qualityStats = {
+        totalConnections: pool.size,
+        highQualityConnections: 0,
+        mediumQualityConnections: 0,
+        lowQualityConnections: 0,
+        averageLatency: 0,
+        averageStability: 0
+      };
+
+      let totalLatency = 0;
+      let totalStability = 0;
+
+      pool.forEach(ws => {
+        const metadata = this.metadata.get(ws);
+        if (metadata) {
+          totalLatency += metadata.quality.latency;
+          totalStability += metadata.quality.stability;
+
+          if (metadata.quality.stability > 0.7) {
+            qualityStats.highQualityConnections++;
+          } else if (metadata.quality.stability > 0.3) {
+            qualityStats.mediumQualityConnections++;
+          } else {
+            qualityStats.lowQualityConnections++;
+          }
+        }
+      });
+
+      if (qualityStats.totalConnections > 0) {
+        qualityStats.averageLatency = totalLatency / qualityStats.totalConnections;
+        qualityStats.averageStability = totalStability / qualityStats.totalConnections;
+
+        console.log(`Session ${sessionId} quality stats:`, qualityStats);
+      }
+    });
+  }
+
   // 获取池统计信息
   getStats(): {
     totalSessions: number;
     totalConnections: number;
-    sessionStats: Array<{ sessionId: string; connectionCount: number }>;
+    sessionStats: Array<{ 
+      sessionId: string; 
+      connectionCount: number;
+      averageQuality: number;
+    }>;
   } {
-    const sessionStats: Array<{ sessionId: string; connectionCount: number }> = [];
+    const sessionStats: Array<{ 
+      sessionId: string; 
+      connectionCount: number;
+      averageQuality: number;
+    }> = [];
     let totalConnections = 0;
 
     this.pools.forEach((pool, sessionId) => {
       const count = pool.size;
-      sessionStats.push({ sessionId, connectionCount: count });
+      let totalQuality = 0;
+      let qualityCount = 0;
+
+      pool.forEach(ws => {
+        const metadata = this.metadata.get(ws);
+        if (metadata) {
+          totalQuality += metadata.quality.stability;
+          qualityCount++;
+        }
+      });
+
+      const averageQuality = qualityCount > 0 ? totalQuality / qualityCount : 0;
+      sessionStats.push({ sessionId, connectionCount: count, averageQuality });
       totalConnections += count;
     });
 
@@ -241,12 +333,16 @@ export class ConnectionPool {
       clearInterval(this.healthCheckTimer);
       this.healthCheckTimer = null;
     }
+    if (this.qualityCheckTimer) {
+      clearInterval(this.qualityCheckTimer);
+      this.qualityCheckTimer = null;
+    }
   }
 }
 
 // 导出单例实例
 export const connectionPool = new ConnectionPool({
   maxPoolSize: 50,
-  healthCheckInterval: 30000,
-  heartbeatTimeout: 35000,
+  healthCheckInterval: 15000, // 15秒
+  heartbeatTimeout: 45000 // 45秒
 }); 
