@@ -8,8 +8,6 @@
     "lint": "next lint",
     "start": "next start",
     "websocket": "tsx websocket-server.ts",
-    "test:websocket": "node scripts/websocket-test.js",
-    "test:websocket:local": "node scripts/websocket-test.js ws://localhost:3001 60000 8 15000",
     "prepare": "husky"
   },
   "dependencies": {

@@ -42,7 +42,6 @@ interface WebSocketMessage {
     customCards?: string;
   };
   timestamp?: number;
-  sequence?: number;
 }
 
 wss.on("connection", async (ws: WebSocket, request) => {
@@ -199,15 +198,13 @@ async function handleWebSocketMessage(
 
   switch (message.type) {
     case "heartbeat":
-      // 处理心跳，计算响应时间
-      const responseTime = message.timestamp ? Date.now() - message.timestamp : 0;
-      heartbeatManager.handleHeartbeatResponse(userId, responseTime);
+      // 处理心跳
+      heartbeatManager.handleHeartbeatResponse(userId);
       await broadcastToSession(sessionId, {
         type: "heartbeat_ack",
         sessionId,
         userId,
         timestamp: Date.now(),
-        sequence: message.sequence
       });
       break;
 
