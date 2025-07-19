@@ -1,38 +1,44 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { HybridConnectionManager, HybridConnectionState } from '@/lib/hybrid-connection-manager';
+import { SSEConnectionManager, SSEConnectionConfig } from '@/lib/sse-connection-manager';
+import { SSEMessage } from '@/lib/sse-client';
 import { Session } from '@/types/estimation';
 
-interface UseConnectionManagerOptions {
+interface UseSSEConnectionManagerOptions {
   sessionId: string;
   userId: string;
-  preferredConnectionType?: 'sse' | 'websocket' | 'auto';
   onSessionUpdate?: (session: Session) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
-  onError?: (error: any) => void;
-  onConnectionTypeChange?: (type: 'sse' | 'websocket' | 'http') => void;
+  onError?: (error: unknown) => void;
+  onConnectionTypeChange?: (type: 'sse' | 'http') => void;
 }
 
-export function useConnectionManager({
+export interface SSEConnectionState {
+  isConnected: boolean;
+  isConnecting: boolean;
+  connectionType: 'sse' | 'http' | 'disconnected';
+  lastHeartbeat: number;
+  reconnectAttempts: number;
+}
+
+export function useSSEConnectionManager({
   sessionId,
   userId,
-  preferredConnectionType = 'auto',
   onSessionUpdate,
   onConnect,
   onDisconnect,
   onError,
   onConnectionTypeChange
-}: UseConnectionManagerOptions) {
-  const [connectionState, setConnectionState] = useState<HybridConnectionState>({
+}: UseSSEConnectionManagerOptions) {
+  const [connectionState, setConnectionState] = useState<SSEConnectionState>({
     isConnected: false,
     isConnecting: false,
     connectionType: 'disconnected',
     lastHeartbeat: 0,
-    reconnectAttempts: 0,
-    preferredType: preferredConnectionType
+    reconnectAttempts: 0
   });
 
-  const connectionManagerRef = useRef<HybridConnectionManager | null>(null);
+  const connectionManagerRef = useRef<SSEConnectionManager | null>(null);
 
   // 初始化连接管理器
   const initConnectionManager = useCallback(() => {
@@ -40,13 +46,15 @@ export function useConnectionManager({
       connectionManagerRef.current.disconnect();
     }
 
-    const websocketUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/websocket?sessionId=${sessionId}&userId=${userId}`;
+    const sseUrl = `${window.location.protocol === 'https:' ? 'https:' : 'http:'}//${window.location.host}/api/sse?sessionId=${sessionId}&userId=${userId}`;
+    const pollUrl = `/api/session/${sessionId}`;
     
-    connectionManagerRef.current = new ConnectionManager({
+    connectionManagerRef.current = new SSEConnectionManager({
       sessionId,
       userId,
-      websocketUrl,
-      httpPollInterval: 2000,
+      sseUrl,
+      pollUrl,
+      pollInterval: 2000,
       heartbeatInterval: 30000,
       maxReconnectAttempts: 10,
       fallbackDelay: 5000
@@ -58,24 +66,24 @@ export function useConnectionManager({
     });
 
     connectionManagerRef.current.onConnect(() => {
-      console.log('Connection established');
+      console.log('SSE connection established');
       setConnectionState(prev => ({ ...prev, isConnected: true, isConnecting: false }));
       onConnect?.();
     });
 
     connectionManagerRef.current.onDisconnect(() => {
-      console.log('Connection lost');
+      console.log('SSE connection lost');
       setConnectionState(prev => ({ ...prev, isConnected: false }));
       onDisconnect?.();
     });
 
     connectionManagerRef.current.onError((error: any) => {
-      console.error('Connection error:', error);
+      console.error('SSE connection error:', error);
       onError?.(error);
     });
 
-    connectionManagerRef.current.onConnectionTypeChange((type: 'websocket' | 'http') => {
-      console.log('Connection type changed to:', type);
+    connectionManagerRef.current.onConnectionTypeChange((type: 'sse' | 'http') => {
+      console.log('SSE connection type changed to:', type);
       setConnectionState(prev => ({ ...prev, connectionType: type }));
       onConnectionTypeChange?.(type);
     });
@@ -96,7 +104,7 @@ export function useConnectionManager({
       try {
         await connectionManagerRef.current.connect();
       } catch (error) {
-        console.error('Failed to connect:', error);
+        console.error('Failed to connect SSE:', error);
         throw error;
       }
     }
@@ -110,11 +118,11 @@ export function useConnectionManager({
   }, []);
 
   // 发送消息
-  const sendMessage = useCallback((message: Omit<WebSocketMessage, 'timestamp'>) => {
+  const sendMessage = useCallback((message: Omit<SSEMessage, 'timestamp'>) => {
     if (connectionManagerRef.current) {
       connectionManagerRef.current.send(message);
     } else {
-      console.warn('Connection manager not initialized');
+      console.warn('SSE connection manager not initialized');
     }
   }, []);
 

@@ -40,13 +40,18 @@ export function useConnectionManager({
       connectionManagerRef.current.disconnect();
     }
 
+    const sseUrl = `${window.location.protocol === 'https:' ? 'https:' : 'http:'}//${window.location.host}/api/sse?sessionId=${sessionId}&userId=${userId}`;
     const websocketUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/websocket?sessionId=${sessionId}&userId=${userId}`;
+    const pollUrl = `/api/session/${sessionId}`;
     
-    connectionManagerRef.current = new ConnectionManager({
+    connectionManagerRef.current = new HybridConnectionManager({
       sessionId,
       userId,
+      sseUrl,
       websocketUrl,
-      httpPollInterval: 2000,
+      pollUrl,
+      preferredConnectionType,
+      pollInterval: 2000,
       heartbeatInterval: 30000,
       maxReconnectAttempts: 10,
       fallbackDelay: 5000
@@ -58,24 +63,24 @@ export function useConnectionManager({
     });
 
     connectionManagerRef.current.onConnect(() => {
-      console.log('Connection established');
+      console.log('Hybrid connection established');
       setConnectionState(prev => ({ ...prev, isConnected: true, isConnecting: false }));
       onConnect?.();
     });
 
     connectionManagerRef.current.onDisconnect(() => {
-      console.log('Connection lost');
+      console.log('Hybrid connection lost');
       setConnectionState(prev => ({ ...prev, isConnected: false }));
       onDisconnect?.();
     });
 
     connectionManagerRef.current.onError((error: any) => {
-      console.error('Connection error:', error);
+      console.error('Hybrid connection error:', error);
       onError?.(error);
     });
 
-    connectionManagerRef.current.onConnectionTypeChange((type: 'websocket' | 'http') => {
-      console.log('Connection type changed to:', type);
+    connectionManagerRef.current.onConnectionTypeChange((type: 'sse' | 'websocket' | 'http') => {
+      console.log('Hybrid connection type changed to:', type);
       setConnectionState(prev => ({ ...prev, connectionType: type }));
       onConnectionTypeChange?.(type);
     });
@@ -88,7 +93,7 @@ export function useConnectionManager({
     }, 1000);
 
     return () => clearInterval(stateUpdateInterval);
-  }, [sessionId, userId, onSessionUpdate, onConnect, onDisconnect, onError, onConnectionTypeChange]);
+  }, [sessionId, userId, preferredConnectionType, onSessionUpdate, onConnect, onDisconnect, onError, onConnectionTypeChange]);
 
   // 连接
   const connect = useCallback(async () => {
@@ -96,7 +101,7 @@ export function useConnectionManager({
       try {
         await connectionManagerRef.current.connect();
       } catch (error) {
-        console.error('Failed to connect:', error);
+        console.error('Failed to connect hybrid:', error);
         throw error;
       }
     }
@@ -110,11 +115,11 @@ export function useConnectionManager({
   }, []);
 
   // 发送消息
-  const sendMessage = useCallback((message: Omit<WebSocketMessage, 'timestamp'>) => {
+  const sendMessage = useCallback((message: any) => {
     if (connectionManagerRef.current) {
       connectionManagerRef.current.send(message);
     } else {
-      console.warn('Connection manager not initialized');
+      console.warn('Hybrid connection manager not initialized');
     }
   }, []);
 
@@ -156,6 +161,14 @@ export function useConnectionManager({
     });
   }, [sendMessage, sessionId, userId]);
 
+  // 设置偏好连接类型
+  const setPreferredConnectionType = useCallback((type: 'sse' | 'websocket' | 'auto') => {
+    if (connectionManagerRef.current) {
+      connectionManagerRef.current.setPreferredConnectionType(type);
+      setConnectionState(prev => ({ ...prev, preferredType: type }));
+    }
+  }, []);
+
   // 组件挂载时初始化连接管理器
   useEffect(() => {
     if (sessionId && userId) {
@@ -183,10 +196,12 @@ export function useConnectionManager({
     connectionType: connectionState.connectionType,
     lastHeartbeat: connectionState.lastHeartbeat,
     reconnectAttempts: connectionState.reconnectAttempts,
+    preferredType: connectionState.preferredType,
 
     // 连接管理
     connect,
     disconnect,
+    setPreferredConnectionType,
 
     // 消息发送
     sendMessage,
