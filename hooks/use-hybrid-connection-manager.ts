@@ -1,25 +1,16 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { HybridConnectionManager, HybridConnectionConfig } from '@/lib/hybrid-connection-manager';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { HybridConnectionManager, HybridConnectionState } from '@/lib/hybrid-connection-manager';
 import { Session } from '@/types/estimation';
 
-interface UseHybridConnectionManagerOptions {
+export interface UseHybridConnectionManagerOptions {
   sessionId: string;
   userId: string;
-  preferredConnectionType?: 'sse' | 'websocket' | 'auto';
+  preferredConnectionType?: 'sse' | 'http' | 'auto';
   onSessionUpdate?: (session: Session) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
-  onError?: (error: unknown) => void;
-  onConnectionTypeChange?: (type: 'sse' | 'websocket' | 'http') => void;
-}
-
-export interface HybridConnectionState {
-  isConnected: boolean;
-  isConnecting: boolean;
-  connectionType: 'sse' | 'websocket' | 'http' | 'disconnected';
-  lastHeartbeat: number;
-  reconnectAttempts: number;
-  preferredType: 'sse' | 'websocket' | 'auto';
+  onError?: (error: any) => void;
+  onConnectionTypeChange?: (type: 'sse' | 'http' | 'disconnected') => void;
 }
 
 export function useHybridConnectionManager({
@@ -50,14 +41,12 @@ export function useHybridConnectionManager({
     }
 
     const sseUrl = `${window.location.protocol === 'https:' ? 'https:' : 'http:'}//${window.location.host}/api/sse?sessionId=${sessionId}&userId=${userId}`;
-    const websocketUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/websocket?sessionId=${sessionId}&userId=${userId}`;
     const pollUrl = `/api/session/${sessionId}`;
     
     connectionManagerRef.current = new HybridConnectionManager({
       sessionId,
       userId,
       sseUrl,
-      websocketUrl,
       pollUrl,
       preferredConnectionType,
       pollInterval: 2000,
@@ -88,135 +77,68 @@ export function useHybridConnectionManager({
       onError?.(error);
     });
 
-    connectionManagerRef.current.onConnectionTypeChange((type: 'sse' | 'websocket' | 'http') => {
-      console.log('Hybrid connection type changed to:', type);
+    connectionManagerRef.current.onConnectionTypeChange((type) => {
+      console.log('Connection type changed:', type);
       setConnectionState(prev => ({ ...prev, connectionType: type }));
       onConnectionTypeChange?.(type);
     });
-
-    // 定期更新连接状态
-    const stateUpdateInterval = setInterval(() => {
-      if (connectionManagerRef.current) {
-        setConnectionState(connectionManagerRef.current.getState());
-      }
-    }, 1000);
-
-    return () => clearInterval(stateUpdateInterval);
   }, [sessionId, userId, preferredConnectionType, onSessionUpdate, onConnect, onDisconnect, onError, onConnectionTypeChange]);
 
-  // 连接
+  // 连接方法
   const connect = useCallback(async () => {
-    if (connectionManagerRef.current) {
-      try {
-        await connectionManagerRef.current.connect();
-      } catch (error) {
-        console.error('Failed to connect hybrid:', error);
-        throw error;
-      }
+    if (!connectionManagerRef.current) {
+      initConnectionManager();
     }
-  }, []);
+    
+    if (connectionManagerRef.current) {
+      await connectionManagerRef.current.connect();
+    }
+  }, [initConnectionManager]);
 
-  // 断开连接
+  // 断开连接方法
   const disconnect = useCallback(() => {
     if (connectionManagerRef.current) {
       connectionManagerRef.current.disconnect();
     }
   }, []);
 
-  // 发送消息
-  const sendMessage = useCallback((message: any) => {
+  // 发送消息方法
+  const sendMessage = useCallback(async (message: any) => {
     if (connectionManagerRef.current) {
-      connectionManagerRef.current.send(message);
-    } else {
-      console.warn('Hybrid connection manager not initialized');
+      await connectionManagerRef.current.sendMessage(message);
     }
   }, []);
 
-  // 发送投票
-  const sendVote = useCallback((vote: string) => {
-    sendMessage({
-      type: 'vote',
-      sessionId,
-      userId,
-      data: { vote }
-    });
-  }, [sendMessage, sessionId, userId]);
-
-  // 发送显示投票请求
-  const sendReveal = useCallback(() => {
-    sendMessage({
-      type: 'reveal',
-      sessionId,
-      userId
-    });
-  }, [sendMessage, sessionId, userId]);
-
-  // 发送重置投票请求
-  const sendReset = useCallback(() => {
-    sendMessage({
-      type: 'reset',
-      sessionId,
-      userId
-    });
-  }, [sendMessage, sessionId, userId]);
-
-  // 发送模板更新
-  const sendTemplateUpdate = useCallback((templateData: { type: string; customCards?: string }) => {
-    sendMessage({
-      type: 'template_update',
-      sessionId,
-      userId,
-      data: templateData
-    });
-  }, [sendMessage, sessionId, userId]);
-
-  // 设置偏好连接类型
-  const setPreferredConnectionType = useCallback((type: 'sse' | 'websocket' | 'auto') => {
+  // 获取状态方法
+  const getState = useCallback(() => {
     if (connectionManagerRef.current) {
-      connectionManagerRef.current.setPreferredConnectionType(type);
-      setConnectionState(prev => ({ ...prev, preferredType: type }));
+      return connectionManagerRef.current.getState();
     }
-  }, []);
+    return connectionState;
+  }, [connectionState]);
 
   // 组件挂载时初始化连接管理器
   useEffect(() => {
-    if (sessionId && userId) {
-      const cleanup = initConnectionManager();
-      return cleanup;
-    }
-  }, [sessionId, userId, initConnectionManager]);
+    initConnectionManager();
+  }, [initConnectionManager]);
 
-  // 组件挂载时连接
+  // 组件卸载时清理连接
   useEffect(() => {
-    if (sessionId && userId && connectionManagerRef.current) {
-      connect();
-    }
-
-    // 组件卸载时断开连接
     return () => {
-      disconnect();
+      if (connectionManagerRef.current) {
+        connectionManagerRef.current.disconnect();
+      }
     };
-  }, [sessionId, userId, connect, disconnect]);
+  }, []);
 
   return {
-    // 连接状态
-    isConnected: connectionState.isConnected,
-    isConnecting: connectionState.isConnecting,
-    connectionType: connectionState.connectionType,
-    lastHeartbeat: connectionState.lastHeartbeat,
-    reconnectAttempts: connectionState.reconnectAttempts,
-    preferredType: connectionState.preferredType,
-
-    // 连接管理
+    connectionState,
     connect,
     disconnect,
-    setPreferredConnectionType,
-
-    // 消息发送
     sendMessage,
-    sendVote,
-    sendReveal,
-    sendReset,
-    sendTemplateUpdate
+    getState,
+    isConnected: connectionState.isConnected,
+    isConnecting: connectionState.isConnecting,
+    connectionType: connectionState.connectionType
   };
 } 

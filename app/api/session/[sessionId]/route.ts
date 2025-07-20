@@ -1,0 +1,188 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { redisSessionStore } from '@/lib/redis-session-store';
+import { Session } from '@/types/estimation';
+
+// 获取会话信息（用于HTTP轮询）
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { sessionId: string } }
+) {
+  try {
+    const sessionId = params.sessionId;
+    
+    if (!sessionId) {
+      return NextResponse.json(
+        { error: 'Session ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // 从Redis获取会话信息
+    const session = await redisSessionStore.getSession(sessionId);
+    
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Session not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(session);
+  } catch (error) {
+    console.error('Failed to get session:', error);
+    return NextResponse.json(
+      { error: 'Failed to get session' },
+      { status: 500 }
+    );
+  }
+}
+
+// 处理会话操作（用于HTTP POST消息）
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { sessionId: string } }
+) {
+  try {
+    const sessionId = params.sessionId;
+    const body = await request.json();
+    const { type, userId, data } = body;
+
+    if (!sessionId || !type || !userId) {
+      return NextResponse.json(
+        { error: 'Session ID, type, and user ID are required' },
+        { status: 400 }
+      );
+    }
+
+    // 获取会话
+    const session = await redisSessionStore.getSession(sessionId);
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Session not found' },
+        { status: 404 }
+      );
+    }
+
+    // 处理不同类型的消息
+    switch (type) {
+      case 'vote':
+        if (data?.vote) {
+          await handleVote(session, userId, data.vote);
+        }
+        break;
+
+      case 'reveal':
+        await handleReveal(session, userId);
+        break;
+
+      case 'reset':
+        await handleReset(session, userId);
+        break;
+
+      case 'template_update':
+        if (data?.type) {
+          await handleTemplateUpdate(session, userId, {
+            type: data.type,
+            customCards: data.customCards
+          });
+        }
+        break;
+
+      case 'heartbeat':
+        // 处理心跳，更新用户最后活跃时间
+        await handleHeartbeat(session, userId);
+        break;
+
+      default:
+        return NextResponse.json(
+          { error: 'Unknown message type' },
+          { status: 400 }
+        );
+    }
+
+    // 更新会话
+    await redisSessionStore.updateSession(sessionId, (currentSession) => {
+      return {
+        ...currentSession,
+        ...session
+      };
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Failed to process session action:', error);
+    return NextResponse.json(
+      { error: 'Failed to process action' },
+      { status: 500 }
+    );
+  }
+}
+
+// 处理投票
+async function handleVote(session: Session, userId: string, vote: string) {
+  // 检查用户是否有投票权限
+  const user = session.users.find(u => u.id === userId);
+  if (!user || user.role === 'guest') {
+    throw new Error('User does not have permission to vote');
+  }
+
+  // 检查投票是否已显示
+  if (session.revealed) {
+    throw new Error('Cannot vote after results are revealed');
+  }
+
+  // 更新投票
+  session.votes[userId] = vote;
+  session.lastUpdated = Date.now();
+}
+
+// 处理显示投票
+async function handleReveal(session: Session, userId: string) {
+  // 检查用户是否是主持人
+  if (session.hostId !== userId) {
+    throw new Error('Only the host can reveal votes');
+  }
+
+  session.revealed = true;
+  session.lastUpdated = Date.now();
+}
+
+// 处理重置投票
+async function handleReset(session: Session, userId: string) {
+  // 检查用户是否是主持人
+  if (session.hostId !== userId) {
+    throw new Error('Only the host can reset votes');
+  }
+
+  session.votes = {};
+  session.revealed = false;
+  session.lastUpdated = Date.now();
+}
+
+// 处理模板更新
+async function handleTemplateUpdate(
+  session: Session, 
+  userId: string, 
+  templateData: { type: string; customCards?: string }
+) {
+  // 检查用户是否是主持人
+  if (session.hostId !== userId) {
+    throw new Error('Only the host can update template');
+  }
+
+  session.template = {
+    type: templateData.type,
+    customCards: templateData.customCards
+  };
+  session.lastUpdated = Date.now();
+}
+
+// 处理心跳
+async function handleHeartbeat(session: Session, userId: string) {
+  // 更新用户最后活跃时间
+  const user = session.users.find(u => u.id === userId);
+  if (user) {
+    user.lastActive = Date.now();
+  }
+  session.lastUpdated = Date.now();
+} 

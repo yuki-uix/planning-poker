@@ -1,0 +1,44 @@
+{
+  "functions": {
+    "app/api/sse/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/session/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/stats/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/debug/connection/route.ts": {
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/sse",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        },
+        {
+          "key": "Connection",
+          "value": "keep-alive"
+        },
+        {
+          "key": "Content-Type",
+          "value": "text/event-stream"
+        }
+      ]
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+} 

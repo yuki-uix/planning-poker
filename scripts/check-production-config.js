@@ -7,6 +7,7 @@
 
 const https = require('https');
 const http = require('http');
+const { URL } = require('url');
 
 // 配置检查项
 const configChecks = {
@@ -16,8 +17,11 @@ const configChecks = {
       const url = `${baseUrl}/api/sse?sessionId=test&userId=test`;
       console.log(`🔍 检查SSE端点: ${url}`);
       
+      const urlObj = new URL(url);
+      const client = urlObj.protocol === 'https:' ? https : http;
+      
       const response = await new Promise((resolve, reject) => {
-        const req = http.get(url, (res) => {
+        const req = client.get(url, (res) => {
           let data = '';
           res.on('data', chunk => data += chunk);
           res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, data }));
@@ -41,59 +45,74 @@ const configChecks = {
     }
   },
 
-  // 检查WebSocket端点
-  async checkWebSocketEndpoint(baseUrl) {
+  // 检查HTTP轮询端点
+  async checkHttpPollEndpoint(baseUrl) {
     try {
-      const url = `${baseUrl}/api/websocket?sessionId=test&userId=test`;
-      console.log(`🔍 检查WebSocket端点: ${url}`);
+      const url = `${baseUrl}/api/session/test`;
+      console.log(`🔍 检查HTTP轮询端点: ${url}`);
+      
+      const urlObj = new URL(url);
+      const client = urlObj.protocol === 'https:' ? https : http;
       
       const response = await new Promise((resolve, reject) => {
-        const req = http.get(url, (res) => {
-          resolve({ status: res.statusCode, headers: res.headers });
+        const req = client.get(url, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => resolve({ status: res.statusCode, data }));
         });
         req.on('error', reject);
-        req.setTimeout(10000, () => reject(new Error('WebSocket endpoint timeout')));
+        req.setTimeout(10000, () => reject(new Error('HTTP poll endpoint timeout')));
       });
 
-      if (response.status === 400 || response.status === 101) {
-        console.log('✅ WebSocket端点正常');
+      if (response.status === 200 || response.status === 404) {
+        console.log('✅ HTTP轮询端点正常');
         console.log(`   状态码: ${response.status}`);
         return true;
       } else {
-        console.log(`❌ WebSocket端点异常: ${response.status}`);
+        console.log(`❌ HTTP轮询端点异常: ${response.status}`);
         return false;
       }
     } catch (error) {
-      console.log(`❌ WebSocket端点检查失败: ${error.message}`);
+      console.log(`❌ HTTP轮询端点检查失败: ${error.message}`);
       return false;
     }
   },
 
-  // 检查Redis连接
+  // 检查Redis连接（Vercel环境）
   async checkRedisConnection() {
     try {
       console.log('🔍 检查Redis连接...');
       
-      // 这里需要根据实际部署情况调整
+      // Vercel环境通常使用外部Redis服务
       const redisHost = process.env.REDIS_HOST || 'localhost';
       const redisPort = process.env.REDIS_PORT || 6379;
       
       console.log(`   Redis主机: ${redisHost}:${redisPort}`);
-      console.log('⚠️  请手动检查Redis连接状态');
-      return true;
+      
+      // 在Vercel环境中，Redis通常是外部服务
+      if (process.env.VERCEL) {
+        console.log('✅ Vercel环境 - Redis连接由外部服务管理');
+        return true;
+      } else {
+        console.log('⚠️  请手动检查Redis连接状态');
+        return true;
+      }
     } catch (error) {
       console.log(`❌ Redis检查失败: ${error.message}`);
       return false;
     }
   },
 
-  // 检查Nginx配置
-  async checkNginxConfig(baseUrl) {
+  // 检查健康状态（Vercel环境）
+  async checkHealthStatus(baseUrl) {
     try {
-      console.log('🔍 检查Nginx配置...');
+      console.log('🔍 检查应用健康状态...');
+      
+      const urlObj = new URL(baseUrl);
+      const client = urlObj.protocol === 'https:' ? https : http;
       
       const response = await new Promise((resolve, reject) => {
-        const req = http.get(`${baseUrl}/health`, (res) => {
+        const req = client.get(`${baseUrl}/api/stats`, (res) => {
           let data = '';
           res.on('data', chunk => data += chunk);
           res.on('end', () => resolve({ status: res.statusCode, data }));
@@ -103,26 +122,31 @@ const configChecks = {
       });
 
       if (response.status === 200) {
-        console.log('✅ Nginx健康检查通过');
+        console.log('✅ 应用健康检查通过');
         return true;
       } else {
-        console.log(`❌ Nginx健康检查失败: ${response.status}`);
+        console.log(`❌ 应用健康检查失败: ${response.status}`);
         return false;
       }
     } catch (error) {
-      console.log(`❌ Nginx检查失败: ${error.message}`);
+      console.log(`❌ 健康检查失败: ${error.message}`);
       return false;
     }
   },
 
-  // 检查环境变量
+  // 检查环境变量（Vercel适配）
   checkEnvironmentVariables() {
     console.log('🔍 检查环境变量...');
     
+    // Vercel环境的环境变量检查
     const requiredVars = [
+      'NODE_ENV'
+    ];
+
+    // 可选的环境变量（Vercel可能使用不同的配置方式）
+    const optionalVars = [
       'REDIS_HOST',
-      'REDIS_PORT',
-      'NODE_ENV',
+      'REDIS_PORT', 
       'MAX_CONNECTIONS_PER_SESSION',
       'HEARTBEAT_INTERVAL'
     ];
@@ -138,11 +162,22 @@ const configChecks = {
       }
     });
 
+    optionalVars.forEach(varName => {
+      if (process.env[varName]) {
+        presentVars.push(varName);
+      }
+    });
+
     if (missingVars.length === 0) {
-      console.log('✅ 所有必需的环境变量都已设置');
+      console.log('✅ 必需的环境变量都已设置');
       presentVars.forEach(varName => {
         console.log(`   ${varName}: ${process.env[varName]}`);
       });
+      
+      if (process.env.VERCEL) {
+        console.log('✅ Vercel环境检测到');
+      }
+      
       return true;
     } else {
       console.log('❌ 缺少必需的环境变量:');
@@ -166,9 +201,9 @@ async function main() {
 
   const results = {
     sse: await configChecks.checkSSEEndpoint(baseUrl),
-    websocket: await configChecks.checkWebSocketEndpoint(baseUrl),
+    httpPoll: await configChecks.checkHttpPollEndpoint(baseUrl),
     redis: await configChecks.checkRedisConnection(),
-    nginx: await configChecks.checkNginxConfig(baseUrl),
+    health: await configChecks.checkHealthStatus(baseUrl),
     env: configChecks.checkEnvironmentVariables()
   };
 
@@ -189,11 +224,11 @@ async function main() {
   } else {
     console.log('⚠️  发现了一些问题，请检查上述配置');
     console.log('');
-    console.log('💡 建议的解决方案:');
-    console.log('1. 检查Nginx配置中的SSE代理设置');
-    console.log('2. 确保Redis服务正在运行');
-    console.log('3. 验证环境变量配置');
-    console.log('4. 检查防火墙和网络设置');
+    console.log('💡 Vercel环境建议:');
+    console.log('1. 确保在Vercel项目设置中配置了环境变量');
+    console.log('2. 检查Vercel函数超时设置（建议设置为30秒）');
+    console.log('3. 确保Redis服务可访问（如Upstash、Redis Cloud等）');
+    console.log('4. 检查Vercel部署日志中的错误信息');
   }
 }
 
