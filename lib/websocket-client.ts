@@ -165,18 +165,28 @@ export class WebSocketClient {
     this.clearReconnectTimer();
     this.reconnectAttempts++;
     
+    // 指数退避，最大30秒
     const delay = Math.min(
-      this.config.reconnectInterval! * Math.pow(2, this.reconnectAttempts - 1),
-      30000 // 最大30秒
+      this.config.reconnectInterval! * Math.pow(1.5, this.reconnectAttempts - 1),
+      30000
     );
 
-    console.log(`Scheduling reconnect attempt ${this.reconnectAttempts} in ${delay}ms`);
+    // 添加随机抖动，避免同时重连
+    const jitter = Math.random() * 1000;
+    const finalDelay = delay + jitter;
+
+    console.log(`Scheduling reconnect attempt ${this.reconnectAttempts} in ${finalDelay}ms`);
     
     this.reconnectTimer = setTimeout(() => {
       this.connect().catch(error => {
         console.error('Reconnect failed:', error);
+        // 记录连接稳定性
+        if (typeof window !== 'undefined') {
+          // 在浏览器环境中记录
+          console.warn(`Connection lost: reconnect_failed (websocket) after ${finalDelay}ms`);
+        }
       });
-    }, delay);
+    }, finalDelay);
   }
 
   // 清除重连定时器

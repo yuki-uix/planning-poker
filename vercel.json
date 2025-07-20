@@ -1,16 +1,19 @@
 {
   "functions": {
     "app/api/sse/route.ts": {
-      "maxDuration": 30
+      "maxDuration": 60
     },
     "app/api/session/route.ts": {
-      "maxDuration": 10
+      "maxDuration": 30
     },
     "app/api/stats/route.ts": {
-      "maxDuration": 10
+      "maxDuration": 30
     },
     "app/api/debug/connection/route.ts": {
-      "maxDuration": 10
+      "maxDuration": 30
+    },
+    "app/api/debug/stability/route.ts": {
+      "maxDuration": 30
     }
   },
   "rewrites": [
@@ -37,8 +40,5 @@
         }
       ]
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 } 

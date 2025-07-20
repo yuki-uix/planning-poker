@@ -5,12 +5,12 @@ import { Session } from '@/types/estimation';
 interface UseConnectionManagerOptions {
   sessionId: string;
   userId: string;
-  preferredConnectionType?: 'sse' | 'websocket' | 'auto';
+  preferredConnectionType?: 'sse' | 'http' | 'auto';
   onSessionUpdate?: (session: Session) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: any) => void;
-  onConnectionTypeChange?: (type: 'sse' | 'websocket' | 'http') => void;
+  onConnectionTypeChange?: (type: 'sse' | 'http' | 'disconnected') => void;
 }
 
 export function useConnectionManager({
@@ -41,14 +41,12 @@ export function useConnectionManager({
     }
 
     const sseUrl = `${window.location.protocol === 'https:' ? 'https:' : 'http:'}//${window.location.host}/api/sse?sessionId=${sessionId}&userId=${userId}`;
-    const websocketUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/websocket?sessionId=${sessionId}&userId=${userId}`;
     const pollUrl = `/api/session/${sessionId}`;
     
     connectionManagerRef.current = new HybridConnectionManager({
       sessionId,
       userId,
       sseUrl,
-      websocketUrl,
       pollUrl,
       preferredConnectionType,
       pollInterval: 2000,
@@ -79,7 +77,7 @@ export function useConnectionManager({
       onError?.(error);
     });
 
-    connectionManagerRef.current.onConnectionTypeChange((type: 'sse' | 'websocket' | 'http') => {
+    connectionManagerRef.current.onConnectionTypeChange((type: 'sse' | 'http' | 'disconnected') => {
       console.log('Hybrid connection type changed to:', type);
       setConnectionState(prev => ({ ...prev, connectionType: type }));
       onConnectionTypeChange?.(type);
@@ -117,7 +115,7 @@ export function useConnectionManager({
   // 发送消息
   const sendMessage = useCallback((message: any) => {
     if (connectionManagerRef.current) {
-      connectionManagerRef.current.send(message);
+      connectionManagerRef.current.sendMessage(message);
     } else {
       console.warn('Hybrid connection manager not initialized');
     }
@@ -162,12 +160,14 @@ export function useConnectionManager({
   }, [sendMessage, sessionId, userId]);
 
   // 设置偏好连接类型
-  const setPreferredConnectionType = useCallback((type: 'sse' | 'websocket' | 'auto') => {
+  const setPreferredConnectionType = useCallback((type: 'sse' | 'http' | 'auto') => {
     if (connectionManagerRef.current) {
-      connectionManagerRef.current.setPreferredConnectionType(type);
+      // 重新初始化连接管理器以应用新的偏好类型
+      const cleanup = initConnectionManager();
       setConnectionState(prev => ({ ...prev, preferredType: type }));
+      return cleanup;
     }
-  }, []);
+  }, [initConnectionManager]);
 
   // 组件挂载时初始化连接管理器
   useEffect(() => {
@@ -176,6 +176,24 @@ export function useConnectionManager({
       return cleanup;
     }
   }, [sessionId, userId, initConnectionManager]);
+
+  // 页面可见性检测
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('Page hidden, connection may be affected');
+      } else {
+        console.log('Page visible, checking connection status');
+        // 页面重新可见时检查连接状态
+        if (connectionManagerRef.current && !connectionState.isConnected) {
+          connect().catch(console.error);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [connectionState.isConnected, connect]);
 
   // 组件挂载时连接
   useEffect(() => {

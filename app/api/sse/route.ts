@@ -180,7 +180,7 @@ export async function GET(request: NextRequest) {
         const connection = sseConnections.get(userId);
         if (connection) {
           const now = Date.now();
-          if (now - connection.lastHeartbeat > 60000) { // 60秒超时
+          if (now - connection.lastHeartbeat > 90000) { // 90秒超时（更宽松）
             console.log(`SSE connection timeout for user ${userId}`);
             sseConnections.delete(userId);
             clearInterval(heartbeatInterval);

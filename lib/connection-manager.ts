@@ -174,11 +174,20 @@ export class ConnectionManager {
       // 如果HTTP轮询也失败，尝试重新连接WebSocket
       if (this.state.reconnectAttempts < this.config.maxReconnectAttempts!) {
         this.state.reconnectAttempts++;
+        
+        // 指数退避重连
+        const delay = Math.min(5000 * Math.pow(1.5, this.state.reconnectAttempts - 1), 30000);
+        const jitter = Math.random() * 1000;
+        const finalDelay = delay + jitter;
+        
+        console.log(`HTTP polling failed, scheduling WebSocket reconnect in ${finalDelay}ms`);
+        
         setTimeout(() => {
           this.connectWebSocket().catch(() => {
             // WebSocket连接失败，继续HTTP轮询
+            console.warn(`Connection lost: websocket_fallback_failed (http) after ${finalDelay}ms`);
           });
-        }, 5000);
+        }, finalDelay);
       }
     }
   }

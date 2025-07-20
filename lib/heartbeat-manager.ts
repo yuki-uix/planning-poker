@@ -208,7 +208,7 @@ export class HeartbeatManager {
 
 // 导出单例实例
 export const heartbeatManager = new HeartbeatManager({
-  interval: 25000, // 25秒心跳
-  timeout: 35000,  // 35秒超时
-  maxMissedBeats: 2 // 最多丢失2次心跳
+  interval: 15000, // 15秒心跳（更频繁）
+  timeout: 45000,  // 45秒超时（更宽松）
+  maxMissedBeats: 3 // 最多丢失3次心跳（更宽容）
 }); 
