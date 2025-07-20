@@ -1,11 +1,14 @@
-// 混合连接管理器
-// 优先使用SSE，失败时自动降级到WebSocket，最后降级到HTTP轮询
+// 增强的混合连接管理器
+// 集成自适应心跳、智能重连和连接质量监控
 // 提供最稳定的连接体验
 
 import { Session } from '@/types/estimation';
 import { SSEConnectionManager } from './sse-connection-manager';
 import { connectionDebugger } from './connection-debugger';
 import { connectionStabilityMonitor } from './connection-stability-monitor';
+import { adaptiveHeartbeatManager } from './adaptive-heartbeat-manager';
+import { smartReconnectionManager } from './smart-reconnection-manager';
+import { connectionQualityMonitor } from './connection-quality-monitor';
 
 export interface HybridConnectionState {
   isConnected: boolean;
@@ -26,6 +29,8 @@ export interface HybridConnectionConfig {
   heartbeatInterval?: number;
   maxReconnectAttempts?: number;
   fallbackDelay?: number;
+  enableAdaptiveFeatures?: boolean; // 启用自适应功能
+  qualityMonitoring?: boolean; // 启用质量监控
 }
 
 export interface ConnectionMessage {
@@ -57,6 +62,8 @@ export class HybridConnectionManager {
       heartbeatInterval: 30000,
       maxReconnectAttempts: 10,
       fallbackDelay: 5000,
+      enableAdaptiveFeatures: true,
+      qualityMonitoring: true,
       ...config
     };
 
@@ -70,7 +77,7 @@ export class HybridConnectionManager {
     };
   }
 
-  // 连接方法
+  // 智能连接方法
   async connect(): Promise<void> {
     if (this.state.isConnected || this.state.isConnecting) {
       return;
@@ -89,17 +96,28 @@ export class HybridConnectionManager {
     });
 
     try {
-      if (this.config.preferredConnectionType === 'sse' || this.config.preferredConnectionType === 'auto') {
-        await this.connectSSE();
+      // 根据连接质量监控器选择最佳连接方式
+      if (this.config.enableAdaptiveFeatures && this.config.qualityMonitoring) {
+        await this.connectWithQualityOptimization();
       } else {
-        await this.connectHttpPoll();
+        // 使用传统连接方式
+        if (this.config.preferredConnectionType === 'sse' || this.config.preferredConnectionType === 'auto') {
+          await this.connectSSE();
+        } else {
+          await this.connectHttpPoll();
+        }
       }
     } catch (error) {
       console.error('Failed to establish initial connection:', error);
       
-      // 如果首选连接失败，尝试降级
+      // 记录连接失败
+      if (this.config.qualityMonitoring) {
+        connectionQualityMonitor.recordMetrics(0, false);
+      }
+      
+      // 智能降级
       if (this.config.preferredConnectionType === 'auto') {
-        await this.fallbackToHttp();
+        await this.intelligentFallback();
       } else {
         this.state.isConnecting = false;
         this.onErrorCallback?.(error instanceof Error ? error : new Error(String(error)));
@@ -294,21 +312,32 @@ export class HybridConnectionManager {
     this.onConnectionTypeChangeCallback?.('http');
   }
 
-  // 开始HTTP轮询
+  // 开始自适应HTTP轮询
   private startHttpPolling(): void {
     if (this.httpPollInterval) {
       clearInterval(this.httpPollInterval);
     }
 
+    // 使用自适应心跳间隔
+    const pollInterval = this.config.enableAdaptiveFeatures ? 
+      adaptiveHeartbeatManager.getAdaptiveInterval() : 
+      this.config.pollInterval;
+
     this.httpPollInterval = setInterval(async () => {
+      const startTime = Date.now();
+      
       try {
+        // 使用自适应超时
+        const timeout = this.config.enableAdaptiveFeatures ? 
+          adaptiveHeartbeatManager.getAdaptiveTimeout() : 
+          15000;
+
         const response = await fetch(this.config.pollUrl, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
-          // 增加超时设置
-          signal: AbortSignal.timeout(15000) // 从10秒增加到15秒
+          signal: AbortSignal.timeout(timeout)
         });
 
         if (response.ok) {
@@ -320,12 +349,24 @@ export class HybridConnectionManager {
             this.state.lastHeartbeat = Date.now();
             this.state.reconnectAttempts = 0; // 重置重连计数
             
+            const responseTime = Date.now() - startTime;
+            
             // 记录成功连接
             connectionStabilityMonitor.logSuccessfulConnection(
               this.config.sessionId,
               this.config.userId,
               'http'
             );
+
+            // 记录质量指标
+            if (this.config.qualityMonitoring) {
+              connectionQualityMonitor.recordMetrics(responseTime, true);
+            }
+
+            // 记录自适应心跳结果
+            if (this.config.enableAdaptiveFeatures) {
+              adaptiveHeartbeatManager.recordHeartbeatResult(true, responseTime);
+            }
           } else {
             throw new Error('Invalid session data received');
           }
@@ -338,7 +379,19 @@ export class HybridConnectionManager {
           throw new Error(`HTTP ${response.status}`);
         }
       } catch (error) {
+        const responseTime = Date.now() - startTime;
         console.error('HTTP polling error:', error);
+        
+        // 记录质量指标
+        if (this.config.qualityMonitoring) {
+          connectionQualityMonitor.recordMetrics(responseTime, false);
+        }
+
+        // 记录自适应心跳结果
+        if (this.config.enableAdaptiveFeatures) {
+          adaptiveHeartbeatManager.recordHeartbeatResult(false, responseTime);
+        }
+
         this.state.reconnectAttempts++;
         
         // 记录调试信息
@@ -360,13 +413,78 @@ export class HybridConnectionManager {
           this.config.userId
         );
 
-        // 增加重连尝试次数
-        if (this.state.reconnectAttempts >= this.config.maxReconnectAttempts! * 2) {
-          this.disconnect();
-          this.onErrorCallback?.(error instanceof Error ? error : new Error(String(error)));
+        // 智能重连处理
+        if (this.config.enableAdaptiveFeatures) {
+          smartReconnectionManager.incrementAttemptCount();
+          
+          if (!smartReconnectionManager.shouldReconnect()) {
+            this.disconnect();
+            this.onErrorCallback?.(error instanceof Error ? error : new Error(String(error)));
+          }
+        } else {
+          // 传统重连逻辑
+          if (this.state.reconnectAttempts >= this.config.maxReconnectAttempts! * 2) {
+            this.disconnect();
+            this.onErrorCallback?.(error instanceof Error ? error : new Error(String(error)));
+          }
         }
       }
-    }, this.config.pollInterval);
+    }, pollInterval);
+  }
+
+  // 基于质量优化的连接方法
+  private async connectWithQualityOptimization(): Promise<void> {
+    const startTime = Date.now();
+    
+    try {
+      // 获取建议的连接类型
+      const recommendedType = connectionQualityMonitor.getRecommendedConnectionType();
+      console.log(`Quality monitor recommends: ${recommendedType}`);
+      
+      // 根据建议选择连接方式
+      switch (recommendedType) {
+        case 'sse':
+          await this.connectSSE();
+          break;
+        case 'websocket':
+          // 暂时使用HTTP轮询，因为WebSocket未实现
+          await this.connectHttpPoll();
+          break;
+        case 'http':
+        default:
+          await this.connectHttpPoll();
+          break;
+      }
+      
+      const responseTime = Date.now() - startTime;
+      connectionQualityMonitor.recordMetrics(responseTime, true);
+      smartReconnectionManager.recordReconnectionResult(true, responseTime, 0);
+      
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      connectionQualityMonitor.recordMetrics(responseTime, false);
+      smartReconnectionManager.recordReconnectionResult(false, responseTime, 0);
+      throw error;
+    }
+  }
+
+  // 智能降级策略
+  private async intelligentFallback(): Promise<void> {
+    console.log('Starting intelligent fallback');
+    
+    const currentQuality = connectionQualityMonitor.getConnectionQuality();
+    const reconnectionStats = smartReconnectionManager.getReconnectionStats();
+    
+    console.log(`Current quality: ${currentQuality.toFixed(2)}, reconnection attempts: ${reconnectionStats.attemptCount}`);
+    
+    if (currentQuality < 0.3 || reconnectionStats.attemptCount >= 5) {
+      // 网络质量很差或重连次数过多，直接使用HTTP轮询
+      console.log('Network quality poor, using HTTP polling directly');
+      await this.connectHttpPoll();
+    } else {
+      // 尝试智能降级
+      await this.fallbackToHttp();
+    }
   }
 
   // 降级到HTTP轮询
@@ -379,8 +497,13 @@ export class HybridConnectionManager {
       this.sseManager = null;
     }
 
-    // 等待一段时间后尝试HTTP轮询
-    await new Promise(resolve => setTimeout(resolve, this.config.fallbackDelay));
+    // 使用智能重连延迟
+    const delay = this.config.enableAdaptiveFeatures ? 
+      smartReconnectionManager.getReconnectionDelay() : 
+      this.config.fallbackDelay;
+    
+    console.log(`Waiting ${delay}ms before HTTP fallback`);
+    await new Promise(resolve => setTimeout(resolve, delay));
     
     if (!this.isManualClose) {
       await this.connectHttpPoll();

@@ -10,6 +10,7 @@ interface ConnectionDebugPanelProps {
   userId?: string;
   isConnected: boolean;
   connectionType: string;
+  showQualityMonitoring?: boolean; // 是否显示质量监控
 }
 
 interface DebugInfo {
@@ -34,6 +35,41 @@ interface DebugInfo {
     averageReconnectAttempts: number;
     mostUsedConnectionType: string;
   };
+  quality?: {
+    quality: {
+      totalRequests: number;
+      failedRequests: number;
+      successRate: number;
+      averageLatency: number;
+      currentJitter: number;
+      connectionStability: number;
+      packetLossRate: number;
+      qualityReport: {
+        overallScore: number;
+        recommendation: string;
+        suggestedConnectionType: string;
+        shouldDegrade: boolean;
+        shouldUpgrade: boolean;
+      };
+    };
+    heartbeat: {
+      networkQuality: number;
+      consecutiveSuccesses: number;
+      consecutiveFailures: number;
+      successRate: number;
+      averageResponseTime: number;
+      currentInterval: number;
+      currentTimeout: number;
+    };
+    reconnection: {
+      attemptCount: number;
+      networkStability: number;
+      successRate: number;
+      averageResponseTime: number;
+      averageDelay: number;
+      shouldReconnect: boolean;
+    };
+  };
   recentLogs: Array<{
     timestamp: number;
     connectionType: string;
@@ -53,20 +89,37 @@ export function ConnectionDebugPanel({
   sessionId,
   userId,
   isConnected,
-  connectionType
+  connectionType,
+  showQualityMonitoring = false
 }: ConnectionDebugPanelProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  const updateDebugInfo = useCallback(() => {
+  const updateDebugInfo = useCallback(async () => {
     const stabilityReport = connectionStabilityMonitor.getStabilityReport();
     const debugSummary = connectionDebugger.getSummary();
     const debugLog = connectionDebugger.getDebugLog();
 
+    let qualityData = undefined;
+    if (showQualityMonitoring) {
+      try {
+        const response = await fetch('/api/debug/quality');
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            qualityData = result.data;
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch quality data:', error);
+      }
+    }
+
     setDebugInfo({
       stability: stabilityReport,
       debug: debugSummary,
+      quality: qualityData,
       recentLogs: debugLog.slice(-10), // 最近10条日志
       currentState: {
         sessionId,
@@ -77,7 +130,7 @@ export function ConnectionDebugPanel({
       }
     });
     setLastUpdate(new Date());
-  }, [sessionId, userId, isConnected, connectionType]);
+  }, [sessionId, userId, isConnected, connectionType, showQualityMonitoring]);
 
   useEffect(() => {
     if (isVisible) {
@@ -172,6 +225,44 @@ export function ConnectionDebugPanel({
                     {session.sessionId}: {session.disconnections}次断开
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* 质量监控 */}
+          {showQualityMonitoring && debugInfo?.quality && (
+            <div>
+              <h4 className="text-sm font-medium mb-2 text-blue-600">质量监控</h4>
+              <div className="text-xs space-y-2">
+                {/* 连接质量 */}
+                <div className="border-l-2 border-blue-300 pl-2">
+                  <div className="font-medium">连接质量</div>
+                  <div>成功率: {(debugInfo.quality.quality.successRate * 100).toFixed(1)}%</div>
+                  <div>平均延迟: {debugInfo.quality.quality.averageLatency.toFixed(0)}ms</div>
+                  <div>抖动: {debugInfo.quality.quality.currentJitter.toFixed(0)}ms</div>
+                  <div>稳定性: {(debugInfo.quality.quality.connectionStability * 100).toFixed(1)}%</div>
+                  <div>建议: {debugInfo.quality.quality.qualityReport.recommendation}</div>
+                </div>
+
+                {/* 心跳状态 */}
+                <div className="border-l-2 border-green-300 pl-2">
+                  <div className="font-medium">心跳状态</div>
+                  <div>网络质量: {(debugInfo.quality.heartbeat.networkQuality * 100).toFixed(1)}%</div>
+                  <div>连续成功: {debugInfo.quality.heartbeat.consecutiveSuccesses}</div>
+                  <div>连续失败: {debugInfo.quality.heartbeat.consecutiveFailures}</div>
+                  <div>心跳间隔: {debugInfo.quality.heartbeat.currentInterval}ms</div>
+                  <div>超时时间: {debugInfo.quality.heartbeat.currentTimeout}ms</div>
+                </div>
+
+                {/* 重连状态 */}
+                <div className="border-l-2 border-orange-300 pl-2">
+                  <div className="font-medium">重连状态</div>
+                  <div>尝试次数: {debugInfo.quality.reconnection.attemptCount}</div>
+                  <div>网络稳定性: {(debugInfo.quality.reconnection.networkStability * 100).toFixed(1)}%</div>
+                  <div>重连成功率: {(debugInfo.quality.reconnection.successRate * 100).toFixed(1)}%</div>
+                  <div>平均延迟: {debugInfo.quality.reconnection.averageResponseTime.toFixed(0)}ms</div>
+                  <div>建议连接: {debugInfo.quality.quality.qualityReport.suggestedConnectionType}</div>
+                </div>
               </div>
             </div>
           )}

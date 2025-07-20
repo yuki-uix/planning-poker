@@ -65,7 +65,7 @@ export function useSessionState(
     
     const startTime = Date.now();
     
-    // 添加重试机制
+    // 使用智能重连策略
     let retryCount = 0;
     const maxRetries = 3;
     
@@ -86,6 +86,14 @@ export function useSessionState(
           
           // 记录成功
           stabilityEnhancerRef.current?.recordSuccess('poll', responseTime);
+          
+          // 记录质量指标
+          if (typeof window !== 'undefined') {
+            // 在浏览器环境中记录
+            const { connectionQualityMonitor } = await import('@/lib/connection-quality-monitor');
+            connectionQualityMonitor.recordMetrics(responseTime, true);
+          }
+          
           return; // 成功获取数据，退出重试循环
         } else {
           // 会话不存在或获取失败
@@ -94,22 +102,30 @@ export function useSessionState(
           setIsConnected(false);
           return;
         }
-          } catch (error) {
-      retryCount++;
-      console.error(`Poll session attempt ${retryCount} failed:`, error);
+      } catch (error) {
+        retryCount++;
+        console.error(`Poll session attempt ${retryCount} failed:`, error);
         
+        const responseTime = Date.now() - startTime;
         stabilityEnhancerRef.current?.recordFailure(
           error instanceof Error ? error.message : 'Poll failed',
           'poll'
         );
+        
+        // 记录质量指标
+        if (typeof window !== 'undefined') {
+          const { connectionQualityMonitor } = await import('@/lib/connection-quality-monitor');
+          connectionQualityMonitor.recordMetrics(responseTime, false);
+        }
         
         if (retryCount >= maxRetries) {
           setIsConnected(false);
           return;
         }
         
-        // 指数退避重试
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+        // 使用智能重连延迟
+        const delay = retryCount === 1 ? 1000 : Math.pow(2, retryCount) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }, [sessionId, currentUser]);
@@ -126,17 +142,39 @@ export function useSessionState(
       if (result.success) {
         setIsConnected(true);
         stabilityEnhancerRef.current?.recordSuccess('heartbeat', responseTime);
+        
+        // 记录自适应心跳结果
+        if (typeof window !== 'undefined') {
+          const { adaptiveHeartbeatManager } = await import('@/lib/adaptive-heartbeat-manager');
+          adaptiveHeartbeatManager.recordHeartbeatResult(true, responseTime);
+        }
       } else {
         console.warn("Heartbeat failed:", result.error);
         stabilityEnhancerRef.current?.recordFailure(result.error || 'Heartbeat failed', 'heartbeat');
+        
+        // 记录自适应心跳结果
+        if (typeof window !== 'undefined') {
+          const { adaptiveHeartbeatManager } = await import('@/lib/adaptive-heartbeat-manager');
+          adaptiveHeartbeatManager.recordHeartbeatResult(false, responseTime);
+        }
+        
         setIsConnected(false);
       }
     } catch (error) {
       console.error("Heartbeat error:", error);
+      const responseTime = Date.now() - startTime;
+      
       stabilityEnhancerRef.current?.recordFailure(
         error instanceof Error ? error.message : 'Heartbeat error',
         'heartbeat'
       );
+      
+      // 记录自适应心跳结果
+      if (typeof window !== 'undefined') {
+        const { adaptiveHeartbeatManager } = await import('@/lib/adaptive-heartbeat-manager');
+        adaptiveHeartbeatManager.recordHeartbeatResult(false, responseTime);
+      }
+      
       setIsConnected(false);
     }
   }, [sessionId, currentUser]);

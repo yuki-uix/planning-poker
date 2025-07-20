@@ -153,6 +153,7 @@ export function PointEstimationTool() {
           userId={currentUser}
           isConnected={isConnected}
           connectionType="http"
+          showQualityMonitoring={true}
         />
       )}
     </>
