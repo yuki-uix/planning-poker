@@ -5,6 +5,7 @@
 import { SSEConnectionManager } from './sse-connection-manager';
 import { ConnectionManager } from './connection-manager';
 import { Session } from '@/types/estimation';
+import { connectionDebugger } from './connection-debugger';
 
 export interface HybridConnectionConfig {
   sessionId: string;
@@ -117,6 +118,16 @@ export class HybridConnectionManager {
       this.state.isConnecting = false;
       this.state.connectionType = 'sse';
       this.state.reconnectAttempts = 0;
+      
+      // 记录调试信息
+      connectionDebugger.logStateChange({
+        connectionType: 'sse',
+        isConnected: true,
+        isConnecting: false,
+        lastHeartbeat: this.state.lastHeartbeat,
+        reconnectAttempts: this.state.reconnectAttempts
+      });
+      
       this.onConnectCallback?.();
       this.onConnectionTypeChangeCallback?.('sse');
     });
@@ -124,6 +135,17 @@ export class HybridConnectionManager {
     this.sseManager.onDisconnect(() => {
       this.state.isConnected = false;
       this.state.connectionType = 'disconnected';
+      
+      // 记录调试信息
+      connectionDebugger.logStateChange({
+        connectionType: 'disconnected',
+        isConnected: false,
+        isConnecting: false,
+        lastHeartbeat: this.state.lastHeartbeat,
+        reconnectAttempts: this.state.reconnectAttempts,
+        error: 'SSE connection lost'
+      });
+      
       this.onDisconnectCallback?.();
 
       if (!this.isManualClose) {

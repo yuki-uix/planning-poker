@@ -228,9 +228,14 @@ export class SSEClient {
   private startHeartbeat(): void {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => {
+      // 从SSE URL中提取sessionId
+      const url = new URL(this.config.sseUrl);
+      const sessionId = url.searchParams.get('sessionId') || '';
+      
       this.send({
         type: 'heartbeat',
-        sessionId: '', // 从URL中获取
+        sessionId,
+        userId: url.searchParams.get('userId') || ''
       });
     }, this.config.heartbeatInterval);
   }
