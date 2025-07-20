@@ -37,23 +37,39 @@ export class RedisSessionStore {
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT || '6379'),
       password: process.env.REDIS_PASSWORD,
-      maxRetriesPerRequest: 3,
+      maxRetriesPerRequest: 5, // 增加重试次数
       lazyConnect: true,
-      enableOfflineQueue: false,
+      enableOfflineQueue: true, // 启用离线队列
       enableReadyCheck: true,
-      // maxLoadingTimeout: 10000, // 已移除
+      // 新增超时配置
+      connectTimeout: 10000,
+      commandTimeout: 5000,
     });
 
+    // 增强错误处理
     this.redis.on('error', (error: Error) => {
       console.error('Redis connection error:', error);
+      // 记录错误但不中断应用
     });
 
     this.redis.on('connect', () => {
       console.log('Connected to Redis');
     });
+
+    this.redis.on('ready', () => {
+      console.log('Redis is ready');
+    });
+
+    this.redis.on('close', () => {
+      console.log('Redis connection closed');
+    });
+
+    this.redis.on('reconnecting', () => {
+      console.log('Redis reconnecting...');
+    });
   }
 
-  // 获取会话
+  // 获取会话 - 优化清理逻辑
   async getSession(sessionId: string): Promise<SessionData | null> {
     try {
       const sessionData = await this.redis.get(`${this.SESSION_PREFIX}${sessionId}`);
@@ -61,25 +77,28 @@ export class RedisSessionStore {
 
       const session = JSON.parse(sessionData) as SessionData;
       
-      // 清理非活跃用户（60秒心跳检测）
+      // 更宽松的活跃用户检测（从60秒改为120秒）
       const now = Date.now();
       const activeUsers = session.users.filter(
-        (user) => now - user.lastSeen < 60000
+        (user) => now - user.lastSeen < 120000 // 2分钟
       );
 
-      if (activeUsers.length !== session.users.length) {
+      // 只有当用户数量显著减少时才清理
+      if (activeUsers.length < session.users.length * 0.8) {
         const updatedSession = { ...session, users: activeUsers };
         await this.redis.setex(
           `${this.SESSION_PREFIX}${sessionId}`, 
           this.SESSION_TTL, 
           JSON.stringify(updatedSession)
         );
+        console.log(`Cleaned up ${session.users.length - activeUsers.length} inactive users from session ${sessionId}`);
         return updatedSession;
       }
 
       return session;
     } catch (error) {
       console.error('Failed to get session:', error);
+      // 返回null而不是抛出错误，避免级联失败
       return null;
     }
   }

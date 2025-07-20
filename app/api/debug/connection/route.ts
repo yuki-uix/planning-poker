@@ -1,76 +1,59 @@
-import { NextRequest } from 'next/server';
-import { connectionDebugger } from '@/lib/connection-debugger';
+import { NextRequest, NextResponse } from 'next/server';
+import { redisSessionStore } from '@/lib/redis-session-store';
+import { connectionStabilityMonitor } from '@/lib/connection-stability-monitor';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const debugInfo = connectionDebugger.exportDebugInfo();
-    const summary = connectionDebugger.getSummary();
-    
-    return new Response(JSON.stringify({
-      success: true,
-      timestamp: Date.now(),
-      summary,
-      debugInfo: JSON.parse(debugInfo)
-    }), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache'
-      }
-    });
-  } catch (error) {
-    console.error('Failed to get connection debug info:', error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: 'Failed to get debug info'
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
+    const { searchParams } = new URL(request.url);
+    const sessionId = searchParams.get('sessionId');
+    const userId = searchParams.get('userId');
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { action } = body;
-
-    switch (action) {
-      case 'clear':
-        connectionDebugger.clear();
-        return new Response(JSON.stringify({
-          success: true,
-          message: 'Debug log cleared'
-        }), {
-          headers: { 'Content-Type': 'application/json' }
-        });
-
-      case 'export':
-        const debugInfo = connectionDebugger.exportDebugInfo();
-        return new Response(debugInfo, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Disposition': 'attachment; filename="connection-debug.json"'
-          }
-        });
-
-      default:
-        return new Response(JSON.stringify({
-          success: false,
-          error: 'Invalid action'
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
+    // 检查Redis连接
+    let redisStatus = 'unknown';
+    try {
+      await redisSessionStore.getStats();
+      redisStatus = 'connected';
+    } catch (error) {
+      redisStatus = 'disconnected';
+      console.error('Redis connection check failed:', error);
     }
-  } catch (error) {
-    console.error('Failed to handle debug action:', error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: 'Failed to handle action'
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
+
+    // 获取会话信息
+    let sessionInfo = null;
+    if (sessionId) {
+      try {
+        sessionInfo = await redisSessionStore.getSession(sessionId);
+      } catch (error) {
+        console.error('Failed to get session info:', error);
+      }
+    }
+
+    // 获取连接统计
+    const stabilityReport = connectionStabilityMonitor.getStabilityReport();
+
+    return NextResponse.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      redis: {
+        status: redisStatus
+      },
+      session: sessionInfo ? {
+        id: sessionInfo.id,
+        userCount: sessionInfo.users.length,
+        createdAt: sessionInfo.createdAt,
+        revealed: sessionInfo.revealed
+      } : null,
+      stability: stabilityReport,
+      user: userId ? {
+        id: userId,
+        inSession: sessionInfo?.users.some(u => u.id === userId) || false
+      } : null
     });
+  } catch (error) {
+    console.error('Failed to get connection info:', error);
+    return NextResponse.json(
+      { error: 'Failed to get connection info' },
+      { status: 500 }
+    );
   }
 } 

@@ -1,34 +1,25 @@
 import { WebSocket } from 'ws';
 import { connectionPool } from './connection-pool';
 
-export interface HeartbeatConfig {
-  interval: number; // 心跳间隔（毫秒）
-  timeout: number;  // 超时时间（毫秒）
-  maxMissedBeats: number; // 最大丢失心跳数
+interface HeartbeatInfo {
+  lastBeat: number;
+  missedBeats: number;
+  interval: NodeJS.Timeout;
+  ws: WebSocket;
+  lastSuccessfulBeat: number;
 }
 
 export class HeartbeatManager {
-  private heartbeats: Map<string, {
-    lastBeat: number;
-    missedBeats: number;
-    interval: NodeJS.Timeout;
-    ws: WebSocket;
-  }> = new Map();
-  
-  private config: HeartbeatConfig;
-  private isRunning: boolean = false;
+  private heartbeats: Map<string, HeartbeatInfo> = new Map();
+  private config = {
+    interval: 15000, // 15秒心跳间隔（更频繁）
+    timeout: 45000,  // 45秒超时（更宽松）
+    maxMissedBeats: 3, // 最多丢失3次心跳
+    retryInterval: 5000 // 重试间隔
+  };
 
-  constructor(config: HeartbeatConfig = {
-    interval: 25000, // 25秒心跳
-    timeout: 35000,  // 35秒超时
-    maxMissedBeats: 2 // 最多丢失2次心跳
-  }) {
-    this.config = config;
-  }
-
-  // 开始心跳
   startHeartbeat(userId: string, ws: WebSocket): void {
-    // 如果已有心跳，先停止
+    // 停止现有的心跳
     this.stopHeartbeat(userId);
 
     const interval = setInterval(() => {
@@ -39,10 +30,20 @@ export class HeartbeatManager {
       lastBeat: Date.now(),
       missedBeats: 0,
       interval,
-      ws
+      ws,
+      lastSuccessfulBeat: Date.now()
     });
 
     console.log(`Started heartbeat for user ${userId}`);
+  }
+
+  stopHeartbeat(userId: string): void {
+    const heartbeat = this.heartbeats.get(userId);
+    if (heartbeat) {
+      clearInterval(heartbeat.interval);
+      this.heartbeats.delete(userId);
+      console.log(`Stopped heartbeat for user ${userId}`);
+    }
   }
 
   // 执行心跳
@@ -71,10 +72,15 @@ export class HeartbeatManager {
         ws.send(JSON.stringify({
           type: 'heartbeat',
           timestamp: now,
-          userId
+          userId,
+          sessionId: (ws as WebSocket & { sessionId?: string }).sessionId
         }));
         
         heartbeat.lastBeat = now;
+        heartbeat.lastSuccessfulBeat = now;
+        heartbeat.missedBeats = 0; // 重置丢失计数
+        
+        // 更新连接池中的心跳状态
         connectionPool.updateHeartbeat(ws);
       } catch (error) {
         console.error(`Failed to send heartbeat to user ${userId}:`, error);
@@ -90,125 +96,34 @@ export class HeartbeatManager {
     }
   }
 
-  // 处理心跳响应
-  handleHeartbeatResponse(userId: string): void {
-    const heartbeat = this.heartbeats.get(userId);
-    if (heartbeat) {
-      heartbeat.lastBeat = Date.now();
-      heartbeat.missedBeats = 0; // 重置丢失计数
-      connectionPool.updateHeartbeat(heartbeat.ws);
-    }
-  }
-
-  // 停止心跳
-  stopHeartbeat(userId: string): void {
-    const heartbeat = this.heartbeats.get(userId);
-    if (heartbeat) {
-      clearInterval(heartbeat.interval);
-      this.heartbeats.delete(userId);
-      console.log(`Stopped heartbeat for user ${userId}`);
-    }
-  }
-
-  // 关闭连接
   private closeConnection(userId: string, reason: string): void {
     const heartbeat = this.heartbeats.get(userId);
     if (heartbeat) {
-      if (heartbeat.ws.readyState === WebSocket.OPEN) {
-        heartbeat.ws.close(1000, reason);
-      }
+      console.log(`Closing connection for user ${userId}: ${reason}`);
+      heartbeat.ws.close(1000, reason);
       this.stopHeartbeat(userId);
     }
   }
 
-  // 获取心跳状态
-  getHeartbeatStatus(userId: string): {
-    isActive: boolean;
-    lastBeat: number;
-    missedBeats: number;
-    timeSinceLastBeat: number;
-  } | null {
-    const heartbeat = this.heartbeats.get(userId);
-    if (!heartbeat) return null;
-
-    return {
-      isActive: heartbeat.ws.readyState === WebSocket.OPEN,
+  // 获取心跳统计
+  getHeartbeatStats(): Array<{ userId: string; lastBeat: number; missedBeats: number; status: string }> {
+    return Array.from(this.heartbeats.entries()).map(([userId, heartbeat]) => ({
+      userId,
       lastBeat: heartbeat.lastBeat,
       missedBeats: heartbeat.missedBeats,
-      timeSinceLastBeat: Date.now() - heartbeat.lastBeat
-    };
+      status: heartbeat.missedBeats > 0 ? 'warning' : 'healthy'
+    }));
   }
 
-  // 获取所有心跳状态
-  getAllHeartbeatStatus(): Array<{
-    userId: string;
-    isActive: boolean;
-    lastBeat: number;
-    missedBeats: number;
-    timeSinceLastBeat: number;
-  }> {
-    const statuses: Array<{
-      userId: string;
-      isActive: boolean;
-      lastBeat: number;
-      missedBeats: number;
-      timeSinceLastBeat: number;
-    }> = [];
+  // 检查用户是否活跃
+  isUserActive(userId: string): boolean {
+    const heartbeat = this.heartbeats.get(userId);
+    if (!heartbeat) return false;
 
-    for (const [userId, heartbeat] of this.heartbeats.entries()) {
-      statuses.push({
-        userId,
-        isActive: heartbeat.ws.readyState === WebSocket.OPEN,
-        lastBeat: heartbeat.lastBeat,
-        missedBeats: heartbeat.missedBeats,
-        timeSinceLastBeat: Date.now() - heartbeat.lastBeat
-      });
-    }
-
-    return statuses;
-  }
-
-  // 获取心跳统计信息
-  getStats(): {
-    totalHeartbeats: number;
-    activeHeartbeats: number;
-    inactiveHeartbeats: number;
-    averageMissedBeats: number;
-  } {
-    const statuses = this.getAllHeartbeatStatus();
-    const activeHeartbeats = statuses.filter(s => s.isActive).length;
-    const totalMissedBeats = statuses.reduce((sum, s) => sum + s.missedBeats, 0);
-
-    return {
-      totalHeartbeats: statuses.length,
-      activeHeartbeats,
-      inactiveHeartbeats: statuses.length - activeHeartbeats,
-      averageMissedBeats: statuses.length > 0 ? totalMissedBeats / statuses.length : 0
-    };
-  }
-
-  // 停止所有心跳
-  stopAllHeartbeats(): void {
-    for (const [userId] of this.heartbeats.entries()) {
-      this.stopHeartbeat(userId);
-    }
-  }
-
-  // 更新配置
-  updateConfig(newConfig: Partial<HeartbeatConfig>): void {
-    this.config = { ...this.config, ...newConfig };
-    console.log('Updated heartbeat config:', this.config);
-  }
-
-  // 检查是否运行中
-  isActive(): boolean {
-    return this.heartbeats.size > 0;
+    const now = Date.now();
+    return now - heartbeat.lastSuccessfulBeat < this.config.timeout;
   }
 }
 
 // 导出单例实例
-export const heartbeatManager = new HeartbeatManager({
-  interval: 15000, // 15秒心跳（更频繁）
-  timeout: 45000,  // 45秒超时（更宽松）
-  maxMissedBeats: 3 // 最多丢失3次心跳（更宽容）
-}); 
+export const heartbeatManager = new HeartbeatManager(); 

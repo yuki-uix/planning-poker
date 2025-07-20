@@ -17,10 +17,29 @@ export async function GET(
       );
     }
 
-    // 从Redis获取会话信息
-    const session = await redisSessionStore.getSession(sessionId);
+    // 从Redis获取会话信息，增加重试机制
+    let session: Session | null = null;
+    let retries = 0;
+    const maxRetries = 3;
+
+    while (retries < maxRetries) {
+      try {
+        session = await redisSessionStore.getSession(sessionId);
+        break;
+      } catch (error) {
+        retries++;
+        console.error(`Failed to get session (attempt ${retries}/${maxRetries}):`, error);
+        
+        if (retries < maxRetries) {
+          // 指数退避重试
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 1000));
+        }
+      }
+    }
     
     if (!session) {
+      // 记录会话未找到的情况
+      console.warn(`Session not found: ${sessionId} after ${retries} attempts`);
       return NextResponse.json(
         { error: 'Session not found' },
         { status: 404 }
@@ -54,8 +73,25 @@ export async function POST(
       );
     }
 
-    // 获取会话
-    const session = await redisSessionStore.getSession(sessionId);
+    // 获取会话，增加重试机制
+    let session: Session | null = null;
+    let retries = 0;
+    const maxRetries = 3;
+
+    while (retries < maxRetries) {
+      try {
+        session = await redisSessionStore.getSession(sessionId);
+        break;
+      } catch (error) {
+        retries++;
+        console.error(`Failed to get session for POST (attempt ${retries}/${maxRetries}):`, error);
+        
+        if (retries < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 1000));
+        }
+      }
+    }
+
     if (!session) {
       return NextResponse.json(
         { error: 'Session not found' },
@@ -100,13 +136,30 @@ export async function POST(
         );
     }
 
-    // 更新会话
-    await redisSessionStore.updateSession(sessionId, (currentSession) => {
-      return {
-        ...currentSession,
-        ...session
-      };
-    });
+    // 更新会话，增加重试机制
+    let updateRetries = 0;
+    const maxUpdateRetries = 3;
+
+    while (updateRetries < maxUpdateRetries) {
+      try {
+        await redisSessionStore.updateSession(sessionId, (currentSession) => {
+          return {
+            ...currentSession,
+            ...session
+          };
+        });
+        break;
+      } catch (error) {
+        updateRetries++;
+        console.error(`Failed to update session (attempt ${updateRetries}/${maxUpdateRetries}):`, error);
+        
+        if (updateRetries < maxUpdateRetries) {
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, updateRetries) * 1000));
+        } else {
+          throw error;
+        }
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

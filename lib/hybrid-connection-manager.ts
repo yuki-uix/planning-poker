@@ -5,6 +5,7 @@
 import { Session } from '@/types/estimation';
 import { SSEConnectionManager } from './sse-connection-manager';
 import { connectionDebugger } from './connection-debugger';
+import { connectionStabilityMonitor } from './connection-stability-monitor';
 
 export interface HybridConnectionState {
   isConnected: boolean;
@@ -305,13 +306,27 @@ export class HybridConnectionManager {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-          }
+          },
+          // 增加超时设置
+          signal: AbortSignal.timeout(10000) // 10秒超时
         });
 
         if (response.ok) {
           const session = await response.json();
-          this.onSessionUpdateCallback?.(session);
-          this.state.lastHeartbeat = Date.now();
+          
+          // 验证会话数据
+          if (session && session.id && session.users) {
+            this.onSessionUpdateCallback?.(session);
+            this.state.lastHeartbeat = Date.now();
+            this.state.reconnectAttempts = 0; // 重置重连计数
+          } else {
+            throw new Error('Invalid session data received');
+          }
+        } else if (response.status === 404) {
+          // 会话不存在，记录并通知
+          console.error('Session not found:', this.config.sessionId);
+          this.onErrorCallback?.(new Error('Session not found'));
+          return;
         } else {
           throw new Error(`HTTP ${response.status}`);
         }
@@ -328,6 +343,15 @@ export class HybridConnectionManager {
           reconnectAttempts: this.state.reconnectAttempts,
           error: error instanceof Error ? error.message : 'HTTP polling failed'
         });
+
+        // 记录断开连接
+        connectionStabilityMonitor.logDisconnection(
+          error instanceof Error ? error.message : 'HTTP polling failed',
+          'http',
+          Date.now() - this.state.lastHeartbeat,
+          this.config.sessionId,
+          this.config.userId
+        );
 
         if (this.state.reconnectAttempts >= this.config.maxReconnectAttempts!) {
           this.disconnect();
