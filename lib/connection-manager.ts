@@ -1,49 +1,54 @@
-// 混合连接管理器
-// 优先使用WebSocket，失败时自动降级到HTTP轮询
-// 提供更稳定的连接体验
+// 统一的连接管理器
+// 简化版本，专注于稳定性
 
-import { WebSocketClient, WebSocketMessage } from './websocket-client';
 import { Session } from '@/types/estimation';
+
+export interface ConnectionState {
+  isConnected: boolean;
+  isConnecting: boolean;
+  connectionType: 'http' | 'disconnected';
+  lastHeartbeat: number;
+  reconnectAttempts: number;
+}
 
 export interface ConnectionConfig {
   sessionId: string;
   userId: string;
-  websocketUrl: string;
-  httpPollInterval?: number;
+  pollUrl: string;
+  pollInterval?: number;
   heartbeatInterval?: number;
   maxReconnectAttempts?: number;
   fallbackDelay?: number;
 }
 
-export interface ConnectionState {
-  isConnected: boolean;
-  isConnecting: boolean;
-  connectionType: 'websocket' | 'http' | 'disconnected';
-  lastHeartbeat: number;
-  reconnectAttempts: number;
+export interface ConnectionMessage {
+  type: string;
+  sessionId: string;
+  userId: string;
+  data?: Record<string, unknown>;
+  timestamp: number;
 }
 
 export class ConnectionManager {
-  private config: ConnectionConfig;
-  private wsClient: WebSocketClient | null = null;
-  private httpPollTimer: NodeJS.Timeout | null = null;
-  private heartbeatTimer: NodeJS.Timeout | null = null;
+  private config: Required<ConnectionConfig>;
   private state: ConnectionState;
+  private httpPollInterval: NodeJS.Timeout | null = null;
+  private heartbeatInterval: NodeJS.Timeout | null = null;
   private isManualClose = false;
 
-  // 事件回调
-  private onSessionUpdateCallback: ((session: Session) => void) | null = null;
-  private onConnectCallback: (() => void) | null = null;
-  private onDisconnectCallback: (() => void) | null = null;
-  private onErrorCallback: ((error: unknown) => void) | null = null;
-  private onConnectionTypeChangeCallback: ((type: 'websocket' | 'http') => void) | null = null;
+  // 回调函数
+  private onSessionUpdateCallback?: (session: Session) => void;
+  private onConnectCallback?: () => void;
+  private onDisconnectCallback?: () => void;
+  private onErrorCallback?: (error: Error | string) => void;
+  private onConnectionTypeChangeCallback?: (type: 'http' | 'disconnected') => void;
 
   constructor(config: ConnectionConfig) {
     this.config = {
-      httpPollInterval: 2000,
-      heartbeatInterval: 30000,
-      maxReconnectAttempts: 10,
-      fallbackDelay: 5000,
+      pollInterval: 8000, // 8秒轮询间隔
+      heartbeatInterval: 15000, // 15秒心跳间隔
+      maxReconnectAttempts: 5,
+      fallbackDelay: 3000,
       ...config
     };
 
@@ -56,207 +61,21 @@ export class ConnectionManager {
     };
   }
 
-  // 连接（优先WebSocket）
+  // 连接
   async connect(): Promise<void> {
     if (this.state.isConnected || this.state.isConnecting) {
       return;
     }
 
-    this.isManualClose = false;
     this.state.isConnecting = true;
+    this.isManualClose = false;
 
     try {
-      // 首先尝试WebSocket连接
-      await this.connectWebSocket();
+      await this.connectHttpPoll();
     } catch (error) {
-      console.log('WebSocket connection failed, falling back to HTTP polling:', error);
-      this.fallbackToHttp();
-    }
-  }
-
-  // 连接WebSocket
-  private async connectWebSocket(): Promise<void> {
-    this.wsClient = new WebSocketClient({
-      url: this.config.websocketUrl,
-      sessionId: this.config.sessionId,
-      userId: this.config.userId,
-      reconnectInterval: 3000,
-      heartbeatInterval: this.config.heartbeatInterval!,
-      maxReconnectAttempts: this.config.maxReconnectAttempts!
-    });
-
-    // 设置WebSocket事件回调
-    this.wsClient.onConnect(() => {
-      this.state.isConnected = true;
+      console.error('Failed to establish connection:', error);
       this.state.isConnecting = false;
-      this.state.connectionType = 'websocket';
-      this.state.reconnectAttempts = 0;
-      this.startHeartbeat();
-      this.onConnectCallback?.();
-      this.onConnectionTypeChangeCallback?.('websocket');
-    });
-
-    this.wsClient.onDisconnect(() => {
-      this.state.isConnected = false;
-      this.state.connectionType = 'disconnected';
-      this.stopHeartbeat();
-      this.onDisconnectCallback?.();
-
-      if (!this.isManualClose) {
-        this.fallbackToHttp();
-      }
-    });
-
-    this.wsClient.onError((error) => {
-      console.error('WebSocket error:', error);
-      this.onErrorCallback?.(error);
-      
-      if (!this.isManualClose) {
-        this.fallbackToHttp();
-      }
-    });
-
-    this.wsClient.onMessage((message: WebSocketMessage) => {
-      this.handleMessage(message);
-    });
-
-    await this.wsClient.connect();
-  }
-
-  // 降级到HTTP轮询
-  private fallbackToHttp(): void {
-    if (this.state.connectionType === 'http') {
-      return; // 已经在HTTP模式
-    }
-
-    console.log('Falling back to HTTP polling');
-    this.state.connectionType = 'http';
-    this.state.isConnected = true;
-    this.state.isConnecting = false;
-    this.onConnectionTypeChangeCallback?.('http');
-
-    // 延迟启动HTTP轮询，避免立即重试
-    setTimeout(() => {
-      this.startHttpPolling();
-    }, this.config.fallbackDelay);
-  }
-
-  // 启动HTTP轮询
-  private startHttpPolling(): void {
-    if (this.httpPollTimer) {
-      clearInterval(this.httpPollTimer);
-    }
-
-    // 立即执行一次
-    this.pollSession();
-
-    // 设置轮询间隔
-    this.httpPollTimer = setInterval(() => {
-      this.pollSession();
-    }, this.config.httpPollInterval);
-  }
-
-  // HTTP轮询获取会话数据
-  private async pollSession(): Promise<void> {
-    try {
-      const response = await fetch(`/api/session/${this.config.sessionId}`);
-      if (response.ok) {
-        const session = await response.json();
-        this.onSessionUpdateCallback?.(session);
-        this.state.lastHeartbeat = Date.now();
-      } else {
-        throw new Error('Session not found');
-      }
-    } catch (error) {
-      console.error('HTTP polling failed:', error);
-      this.onErrorCallback?.(error);
-      
-      // 如果HTTP轮询也失败，尝试重新连接WebSocket
-      if (this.state.reconnectAttempts < this.config.maxReconnectAttempts!) {
-        this.state.reconnectAttempts++;
-        
-        // 指数退避重连
-        const delay = Math.min(5000 * Math.pow(1.5, this.state.reconnectAttempts - 1), 30000);
-        const jitter = Math.random() * 1000;
-        const finalDelay = delay + jitter;
-        
-        console.log(`HTTP polling failed, scheduling WebSocket reconnect in ${finalDelay}ms`);
-        
-        setTimeout(() => {
-          this.connectWebSocket().catch(() => {
-            // WebSocket连接失败，继续HTTP轮询
-            console.warn(`Connection lost: websocket_fallback_failed (http) after ${finalDelay}ms`);
-          });
-        }, finalDelay);
-      }
-    }
-  }
-
-  // 处理消息
-  private handleMessage(message: WebSocketMessage): void {
-    switch (message.type) {
-      case 'session_update':
-        if (message.data && this.onSessionUpdateCallback && typeof message.data === 'object' && 'id' in message.data) {
-          this.onSessionUpdateCallback(message.data as Session);
-        }
-        break;
-      case 'heartbeat_ack':
-        this.state.lastHeartbeat = Date.now();
-        break;
-      default:
-        console.log('Received message:', message);
-    }
-  }
-
-  // 发送消息
-  send(message: Omit<WebSocketMessage, 'timestamp'>): void {
-    if (this.state.connectionType === 'websocket' && this.wsClient) {
-      this.wsClient.send(message);
-    } else if (this.state.connectionType === 'http') {
-      // HTTP模式下，通过API发送消息
-      this.sendViaHttp(message);
-    } else {
-      console.warn('No active connection, message not sent');
-    }
-  }
-
-  // 通过HTTP发送消息
-  private async sendViaHttp(message: Omit<WebSocketMessage, 'timestamp'>): Promise<void> {
-    try {
-      const response = await fetch('/api/session/action', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(message),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send message via HTTP');
-      }
-    } catch (error) {
-      console.error('Failed to send message via HTTP:', error);
-      this.onErrorCallback?.(error);
-    }
-  }
-
-  // 开始心跳
-  private startHeartbeat(): void {
-    this.stopHeartbeat();
-    this.heartbeatTimer = setInterval(() => {
-      this.send({
-        type: 'heartbeat',
-        sessionId: this.config.sessionId,
-        userId: this.config.userId
-      });
-    }, this.config.heartbeatInterval);
-  }
-
-  // 停止心跳
-  private stopHeartbeat(): void {
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = null;
+      this.onErrorCallback?.(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -265,22 +84,58 @@ export class ConnectionManager {
     this.isManualClose = true;
     this.state.isConnected = false;
     this.state.isConnecting = false;
-    this.state.connectionType = 'disconnected';
 
-    this.stopHeartbeat();
-
-    if (this.httpPollTimer) {
-      clearInterval(this.httpPollTimer);
-      this.httpPollTimer = null;
+    // 停止HTTP轮询
+    if (this.httpPollInterval) {
+      clearInterval(this.httpPollInterval);
+      this.httpPollInterval = null;
     }
 
-    if (this.wsClient) {
-      this.wsClient.disconnect();
-      this.wsClient = null;
+    // 停止心跳
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+
+    this.onDisconnectCallback?.();
+  }
+
+  // 获取状态
+  getState(): ConnectionState {
+    return { ...this.state };
+  }
+
+  // 发送消息
+  async sendMessage(message: ConnectionMessage): Promise<void> {
+    if (!this.state.isConnected) {
+      console.warn('Cannot send message: not connected');
+      return;
+    }
+
+    try {
+      const response = await fetch(this.config.pollUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...message,
+          sessionId: this.config.sessionId,
+          userId: this.config.userId,
+          timestamp: Date.now()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      this.onErrorCallback?.(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
-  // 设置事件回调
+  // 设置回调函数
   onSessionUpdate(callback: (session: Session) => void): void {
     this.onSessionUpdateCallback = callback;
   }
@@ -293,26 +148,80 @@ export class ConnectionManager {
     this.onDisconnectCallback = callback;
   }
 
-  onError(callback: (error: unknown) => void): void {
+  onError(callback: (error: Error | string) => void): void {
     this.onErrorCallback = callback;
   }
 
-  onConnectionTypeChange(callback: (type: 'websocket' | 'http') => void): void {
+  onConnectionTypeChange(callback: (type: 'http' | 'disconnected') => void): void {
     this.onConnectionTypeChangeCallback = callback;
   }
 
-  // 获取连接状态
-  getState(): ConnectionState {
-    return { ...this.state };
+  // HTTP轮询连接
+  private async connectHttpPoll(): Promise<void> {
+    console.log('Connecting via HTTP polling');
+    
+    // 立即执行一次轮询
+    await this.pollSession();
+    
+    // 设置轮询间隔
+    this.httpPollInterval = setInterval(() => {
+      this.pollSession();
+    }, this.config.pollInterval);
+
+    // 设置心跳
+    this.heartbeatInterval = setInterval(() => {
+      this.sendHeartbeat();
+    }, this.config.heartbeatInterval);
+
+    this.state.isConnected = true;
+    this.state.isConnecting = false;
+    this.state.connectionType = 'http';
+    this.state.reconnectAttempts = 0;
+    
+    this.onConnectCallback?.();
+    this.onConnectionTypeChangeCallback?.('http');
   }
 
-  // 检查是否连接
-  isConnected(): boolean {
-    return this.state.isConnected;
+  // HTTP轮询获取会话数据
+  private async pollSession(): Promise<void> {
+    try {
+      const response = await fetch(this.config.pollUrl);
+      
+      if (response.ok) {
+        const session = await response.json();
+        this.onSessionUpdateCallback?.(session);
+        this.state.lastHeartbeat = Date.now();
+        this.state.reconnectAttempts = 0; // 重置重连计数
+      } else {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('HTTP polling failed:', error);
+      
+      this.state.reconnectAttempts++;
+      
+      if (this.state.reconnectAttempts >= this.config.maxReconnectAttempts) {
+        this.state.isConnected = false;
+        this.state.connectionType = 'disconnected';
+        this.onDisconnectCallback?.();
+        this.onConnectionTypeChangeCallback?.('disconnected');
+      }
+      
+      this.onErrorCallback?.(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 
-  // 获取连接类型
-  getConnectionType(): 'websocket' | 'http' | 'disconnected' {
-    return this.state.connectionType;
+  // 发送心跳
+  private async sendHeartbeat(): Promise<void> {
+    try {
+      await this.sendMessage({
+        type: 'heartbeat',
+        sessionId: this.config.sessionId,
+        userId: this.config.userId,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error('Heartbeat failed:', error);
+    }
   }
 } 
