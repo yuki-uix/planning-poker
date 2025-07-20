@@ -8,6 +8,7 @@ import { TemplateSettings } from "@/components/template-settings";
 import { UserStatus } from "@/components/user-status";
 import { VotingCards } from "@/components/voting-cards";
 import { usePointEstimationTool } from "./usePointEstimationTool";
+import { ConnectionDebugPanel } from "../connection-debug-panel";
 
 export function PointEstimationTool() {
   const {
@@ -71,6 +72,15 @@ export function PointEstimationTool() {
           onClose={() => setShowSessionErrorModal(false)}
           onBackToHost={handleBackToHost}
         />
+        {/* 调试面板 - 仅在开发环境显示 */}
+        {process.env.NODE_ENV === 'development' && (
+          <ConnectionDebugPanel
+            sessionId={sessionId}
+            userId={currentUser}
+            isConnected={isConnected}
+            connectionType="http"
+          />
+        )}
       </>
     );
   }
@@ -121,7 +131,12 @@ export function PointEstimationTool() {
             onResetVotes={handleResetVotes}
           />
 
-          {stats && <ResultsDisplay session={session} stats={stats} />}
+          {session.revealed && stats && (
+            <ResultsDisplay
+              session={session}
+              stats={stats}
+            />
+          )}
         </div>
       </div>
 
@@ -130,6 +145,16 @@ export function PointEstimationTool() {
         onClose={() => setShowSessionErrorModal(false)}
         onBackToHost={handleBackToHost}
       />
+
+      {/* 调试面板 - 仅在开发环境显示 */}
+      {process.env.NODE_ENV === 'development' && (
+        <ConnectionDebugPanel
+          sessionId={sessionId}
+          userId={currentUser}
+          isConnected={isConnected}
+          connectionType="http"
+        />
+      )}
     </>
   );
 }

@@ -3,6 +3,7 @@
 
 import { SSEClient, SSEMessage } from './sse-client';
 import { Session } from '@/types/estimation';
+import { connectionStabilityMonitor } from './connection-stability-monitor';
 
 export interface SSEConnectionConfig {
   sessionId: string;
@@ -67,6 +68,16 @@ export class SSEConnectionManager {
       await this.connectSSE();
     } catch (error) {
       console.log('SSE connection failed, falling back to HTTP polling:', error);
+      
+      // 记录连接失败
+      connectionStabilityMonitor.logDisconnection(
+        error instanceof Error ? error.message : 'SSE connection failed',
+        'sse',
+        0,
+        this.config.sessionId,
+        this.config.userId
+      );
+      
       this.fallbackToHttp();
     }
   }
@@ -141,7 +152,11 @@ export class SSEConnectionManager {
     switch (message.type) {
       case 'session_update':
         if (message.data && this.onSessionUpdateCallback && typeof message.data === 'object' && 'id' in message.data) {
-          this.onSessionUpdateCallback(message.data as Session);
+          // 安全地转换为Session类型
+          const sessionData = message.data as unknown as Session;
+          if (sessionData.id && sessionData.users) {
+            this.onSessionUpdateCallback(sessionData);
+          }
         }
         break;
       case 'heartbeat_ack':

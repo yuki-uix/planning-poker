@@ -308,7 +308,7 @@ export class HybridConnectionManager {
             'Content-Type': 'application/json',
           },
           // 增加超时设置
-          signal: AbortSignal.timeout(10000) // 10秒超时
+          signal: AbortSignal.timeout(15000) // 从10秒增加到15秒
         });
 
         if (response.ok) {
@@ -319,6 +319,13 @@ export class HybridConnectionManager {
             this.onSessionUpdateCallback?.(session);
             this.state.lastHeartbeat = Date.now();
             this.state.reconnectAttempts = 0; // 重置重连计数
+            
+            // 记录成功连接
+            connectionStabilityMonitor.logSuccessfulConnection(
+              this.config.sessionId,
+              this.config.userId,
+              'http'
+            );
           } else {
             throw new Error('Invalid session data received');
           }
@@ -353,7 +360,8 @@ export class HybridConnectionManager {
           this.config.userId
         );
 
-        if (this.state.reconnectAttempts >= this.config.maxReconnectAttempts!) {
+        // 增加重连尝试次数
+        if (this.state.reconnectAttempts >= this.config.maxReconnectAttempts! * 2) {
           this.disconnect();
           this.onErrorCallback?.(error instanceof Error ? error : new Error(String(error)));
         }

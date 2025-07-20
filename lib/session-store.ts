@@ -30,13 +30,14 @@ export function getSession(sessionId: string): Session | null {
   const session = sessions.get(sessionId);
   if (!session) return null;
 
-  // Clean up inactive users (not seen for 60 seconds)
+  // 清理不活跃用户（120秒未活跃，增加容错性）
   const now = Date.now();
   const activeUsers = session.users.filter(
-    (user) => now - user.lastSeen < 60000
+    (user) => now - user.lastSeen < 120000 // 从60秒增加到120秒
   );
 
-  if (activeUsers.length !== session.users.length) {
+  // 只有当用户数量显著减少时才清理（80%阈值）
+  if (activeUsers.length < session.users.length * 0.8) {
     const updatedSession = { ...session, users: activeUsers };
     sessions.set(sessionId, updatedSession);
     return updatedSession;
