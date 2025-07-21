@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useCallback, useEffect } from "react";
 import { Session, TemplateType } from "@/types/estimation";
 import {
@@ -74,10 +75,11 @@ export function usePointEstimationTool(): PointEstimationToolState &
     }
   }, [
     userState.userName,
+    userState.setCurrentUser,
+    userState.setSessionId,
     userState.setIsJoined,
     sessionState,
     sessionActions,
-    userState,
   ]);
 
   // 处理加入会话
@@ -111,11 +113,13 @@ export function usePointEstimationTool(): PointEstimationToolState &
     userState.userName,
     userState.sessionId,
     userState.selectedRole,
+    userState.currentUser,
+    userState.setCurrentUser,
+    userState.setSessionId,
     userState.setIsJoined,
     sessionState,
     sessionActions,
     uiState,
-    userState,
   ]);
 
   // 处理投票
@@ -130,7 +134,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
       userState.setSelectedVote(vote);
       await sessionState.sendVote(vote);
     },
-    [sessionState, userState, computedValues.canVote]
+    [sessionState, userState.currentUser, userState.setSelectedVote, computedValues.canVote]
   );
 
   // 处理显示投票
@@ -179,7 +183,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
     sessionState.setIsConnected(true);
     sessionState.setIsLoading(false);
     uiState.clearURL();
-  }, [userState, sessionState, sessionActions, uiState, computedValues.isHost]);
+  }, [userState.sessionId, userState.currentUser, userState.clearUserState, sessionState, sessionActions, uiState, computedValues.isHost]);
 
   // 处理返回主机
   const handleBackToHost = useCallback(() => {
@@ -189,7 +193,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
     sessionState.setIsJoined(false);
     sessionState.setIsConnected(true);
     uiState.clearURL();
-  }, [userState, sessionState, uiState]);
+  }, [userState.clearUserState, sessionState, uiState]);
 
   const resultObj = {
     currentUser: userState.currentUser,
