@@ -1,123 +1,103 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { ConnectionManager, ConnectionState, ConnectionConfig } from '@/lib/connection-manager';
-import { Session } from '@/types/estimation';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ConnectionManager, ConnectionConfig, ConnectionState } from '@/lib/connection-manager';
 
-export interface UseConnectionManagerOptions {
+export interface UseConnectionManagerConfig {
   sessionId: string;
   userId: string;
-  onSessionUpdate?: (session: Session) => void;
-  onConnect?: () => void;
-  onDisconnect?: () => void;
-  onError?: (error: Error | string) => void;
-  onConnectionTypeChange?: (type: 'http' | 'disconnected') => void;
+  pollingInterval?: number;
+  heartbeatInterval?: number;
+  maxRetries?: number;
+  retryDelay?: number;
 }
 
-export function useConnectionManager({
-  sessionId,
-  userId,
-  onSessionUpdate,
-  onConnect,
-  onDisconnect,
-  onError,
-  onConnectionTypeChange
-}: UseConnectionManagerOptions) {
-  const [connectionState, setConnectionState] = useState<ConnectionState>({
+export interface UseConnectionManagerReturn {
+  state: ConnectionState;
+  connect: () => Promise<void>;
+  disconnect: () => void;
+  reconnect: () => Promise<void>;
+  sendMessage: (message: any) => Promise<void>;
+}
+
+export function useConnectionManager(config: UseConnectionManagerConfig): UseConnectionManagerReturn {
+  const [state, setState] = useState<ConnectionState>({
     isConnected: false,
-    isConnecting: false,
-    connectionType: 'disconnected',
     lastHeartbeat: 0,
-    reconnectAttempts: 0
+    retryCount: 0,
+    lastError: null,
+    connectionType: 'polling'
   });
 
   const connectionManagerRef = useRef<ConnectionManager | null>(null);
 
-  // 初始化连接管理器
-  const initConnectionManager = useCallback(() => {
-    if (connectionManagerRef.current) {
-      connectionManagerRef.current.disconnect();
-    }
+  // 创建连接管理器
+  useEffect(() => {
+    const connectionConfig: ConnectionConfig = {
+      sessionId: config.sessionId,
+      userId: config.userId,
+      pollingInterval: config.pollingInterval,
+      heartbeatInterval: config.heartbeatInterval,
+      maxRetries: config.maxRetries,
+      retryDelay: config.retryDelay
+    };
 
-    const pollUrl = `/api/session/${sessionId}`;
-    
-    connectionManagerRef.current = new ConnectionManager({
-      sessionId,
-      userId,
-      pollUrl,
-      pollInterval: 8000, // 8秒轮询
-      heartbeatInterval: 15000, // 15秒心跳
-      maxReconnectAttempts: 5,
-      fallbackDelay: 3000
-    });
+    connectionManagerRef.current = new ConnectionManager(connectionConfig);
 
-    // 设置事件回调
-    connectionManagerRef.current.onSessionUpdate((session: Session) => {
-      onSessionUpdate?.(session);
-    });
+    // 清理函数
+    return () => {
+      if (connectionManagerRef.current) {
+        connectionManagerRef.current.disconnect();
+        connectionManagerRef.current = null;
+      }
+    };
+  }, [config.sessionId, config.userId, config.pollingInterval, config.heartbeatInterval, config.maxRetries, config.retryDelay]);
 
-    connectionManagerRef.current.onConnect(() => {
-      console.log('Connection established');
-      setConnectionState(prev => ({ ...prev, isConnected: true, isConnecting: false }));
-      onConnect?.();
-    });
+  // 状态更新
+  useEffect(() => {
+    if (!connectionManagerRef.current) return;
 
-    connectionManagerRef.current.onDisconnect(() => {
-      console.log('Connection lost');
-      setConnectionState(prev => ({ ...prev, isConnected: false }));
-      onDisconnect?.();
-    });
+    const updateState = () => {
+      const currentState = connectionManagerRef.current?.getState();
+      if (currentState) {
+        setState(currentState);
+      }
+    };
 
-    connectionManagerRef.current.onError((error: Error | string) => {
-      console.error('Connection error:', error);
-      onError?.(error);
-    });
+    // 定期更新状态
+    const interval = setInterval(updateState, 1000);
+    updateState(); // 立即更新一次
 
-    connectionManagerRef.current.onConnectionTypeChange((type) => {
-      setConnectionState(prev => ({ ...prev, connectionType: type }));
-      onConnectionTypeChange?.(type);
-    });
-  }, [sessionId, userId, onSessionUpdate, onConnect, onDisconnect, onError, onConnectionTypeChange]);
+    return () => clearInterval(interval);
+  }, []);
 
-  // 连接
   const connect = useCallback(async () => {
     if (connectionManagerRef.current) {
       await connectionManagerRef.current.connect();
     }
   }, []);
 
-  // 断开连接
   const disconnect = useCallback(() => {
     if (connectionManagerRef.current) {
       connectionManagerRef.current.disconnect();
     }
   }, []);
 
-  // 发送消息
+  const reconnect = useCallback(async () => {
+    if (connectionManagerRef.current) {
+      await connectionManagerRef.current.reconnect();
+    }
+  }, []);
+
   const sendMessage = useCallback(async (message: any) => {
     if (connectionManagerRef.current) {
       await connectionManagerRef.current.sendMessage(message);
     }
   }, []);
 
-  // 初始化
-  useEffect(() => {
-    if (sessionId && userId) {
-      initConnectionManager();
-    }
-
-    return () => {
-      if (connectionManagerRef.current) {
-        connectionManagerRef.current.disconnect();
-      }
-    };
-  }, [sessionId, userId, initConnectionManager]);
-
   return {
-    connectionState,
+    state,
     connect,
     disconnect,
-    sendMessage,
-    isConnected: connectionState.isConnected,
-    isConnecting: connectionState.isConnecting,
-    connectionType: connectionState.connectionType
+    reconnect,
+    sendMessage
   };
 } 

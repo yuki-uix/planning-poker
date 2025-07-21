@@ -37,10 +37,18 @@ global.IntersectionObserver = jest.fn().mockImplementation(() => ({
 }));
 
 // Mock WebSocket
-global.WebSocket = jest.fn().mockImplementation(() => ({
+const WebSocketMock = jest.fn().mockImplementation(() => ({
   addEventListener: jest.fn(),
   removeEventListener: jest.fn(),
   send: jest.fn(),
   close: jest.fn(),
   readyState: 1,
-})); 
+})) as any;
+
+// 添加静态属性
+WebSocketMock.CONNECTING = 0;
+WebSocketMock.OPEN = 1;
+WebSocketMock.CLOSING = 2;
+WebSocketMock.CLOSED = 3;
+
+global.WebSocket = WebSocketMock; 

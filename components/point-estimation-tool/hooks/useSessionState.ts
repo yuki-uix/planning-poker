@@ -1,8 +1,6 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Session } from "@/types/estimation";
-import { getSessionData, heartbeat } from "@/app/actions";
-import { updateSessionState } from "@/lib/persistence";
-import { ConnectionStabilityEnhancer } from "@/lib/connection-stability-enhancer";
+import { useConnectionManager } from "@/hooks/use-connection-manager";
 
 export interface SessionState {
   session: Session | null;
@@ -18,6 +16,11 @@ export interface SessionStateHandlers {
   setIsLoading: (loading: boolean) => void;
   pollSession: () => Promise<void>;
   sendHeartbeat: () => Promise<void>;
+  // 新增的消息发送方法
+  sendVote: (vote: string) => Promise<void>;
+  sendReveal: () => Promise<void>;
+  sendReset: () => Promise<void>;
+  sendTemplateUpdate: (templateData: { type: string; customCards?: string }) => Promise<void>;
 }
 
 export function useSessionState(
@@ -28,201 +31,158 @@ export function useSessionState(
   setIsJoined: (joined: boolean) => void
 ): SessionState & SessionStateHandlers {
   const [session, setSession] = useState<Session | null>(null);
-  const [isConnected, setIsConnected] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  
-  // 连接稳定性增强器
-  const stabilityEnhancerRef = useRef<ConnectionStabilityEnhancer | null>(null);
 
-  // 初始化连接稳定性增强器
-  useEffect(() => {
-    if (sessionId && currentUser && isJoined && !isRestoring) {
-      stabilityEnhancerRef.current = new ConnectionStabilityEnhancer({
-        sessionId,
-        userId: currentUser,
-        maxConsecutiveFailures: 3,
-        healthCheckInterval: 30000,
-        recoveryDelay: 5000
-      });
-      
-      stabilityEnhancerRef.current.startHealthCheck();
-      
-      return () => {
-        stabilityEnhancerRef.current?.destroy();
-        stabilityEnhancerRef.current = null;
-      };
-    }
-  }, [sessionId, currentUser, isJoined, isRestoring]);
+  // 使用统一的连接管理器
+  const { 
+    state, 
+    connect, 
+    disconnect, 
+    sendMessage 
+  } = useConnectionManager({
+    sessionId,
+    userId: currentUser
+  });
 
   // 同步isJoined状态
   useEffect(() => {
     setIsJoined(isJoined);
   }, [isJoined, setIsJoined]);
 
-  const pollSession = useCallback(async () => {
-    console.log("pollSession", { sessionId, currentUser }); // 调试日志
-    if (!sessionId || !currentUser) return;
-    
-    const startTime = Date.now();
-    
-    // 使用智能重连策略
-    let retryCount = 0;
-    const maxRetries = 3;
-    
-    while (retryCount < maxRetries) {
-      try {
-        const result = await getSessionData(sessionId);
-        console.log("getSessionData result", result); // 调试日志
-        
-        const responseTime = Date.now() - startTime;
-        
-        if (result.success && result.session) {
-          setSession(result.session);
-          setIsConnected(true);
-          await updateSessionState(sessionId, {
-            revealed: result.session.revealed,
-            template: result.session.template,
-          });
-          
-          // 记录成功
-          stabilityEnhancerRef.current?.recordSuccess('poll', responseTime);
-          
-          // 记录质量指标
-          if (typeof window !== 'undefined') {
-            // 在浏览器环境中记录
-            const { connectionQualityMonitor } = await import('@/lib/connection-quality-monitor');
-            connectionQualityMonitor.recordMetrics(responseTime, true);
-          }
-          
-          return; // 成功获取数据，退出重试循环
-        } else {
-          // 会话不存在或获取失败
-          console.warn("Session data not available:", result.error);
-          stabilityEnhancerRef.current?.recordFailure(result.error || 'Session not found', 'poll');
-          setIsConnected(false);
-          return;
-        }
-      } catch (error) {
-        retryCount++;
-        console.error(`Poll session attempt ${retryCount} failed:`, error);
-        
-        const responseTime = Date.now() - startTime;
-        stabilityEnhancerRef.current?.recordFailure(
-          error instanceof Error ? error.message : 'Poll failed',
-          'poll'
-        );
-        
-        // 记录质量指标
-        if (typeof window !== 'undefined') {
-          const { connectionQualityMonitor } = await import('@/lib/connection-quality-monitor');
-          connectionQualityMonitor.recordMetrics(responseTime, false);
-        }
-        
-        if (retryCount >= maxRetries) {
-          setIsConnected(false);
-          return;
-        }
-        
-        // 使用智能重连延迟
-        const delay = retryCount === 1 ? 1000 : Math.pow(2, retryCount) * 1000;
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
+  // 当用户加入时连接，离开时断开
+  useEffect(() => {
+    if (isJoined && !isRestoring && sessionId && currentUser) {
+      connect();
+    } else if (!isJoined) {
+      disconnect();
     }
-  }, [sessionId, currentUser]);
+  }, [isJoined, isRestoring, sessionId, currentUser, connect, disconnect]);
 
-  const sendHeartbeat = useCallback(async () => {
-    if (!sessionId || !currentUser) return;
-    
-    const startTime = Date.now();
+  // 手动获取会话数据的函数
+  const fetchSessionData = useCallback(async () => {
+    if (!sessionId) return;
     
     try {
-      const result = await heartbeat(sessionId, currentUser);
-      const responseTime = Date.now() - startTime;
-      
-      if (result.success) {
-        setIsConnected(true);
-        stabilityEnhancerRef.current?.recordSuccess('heartbeat', responseTime);
-        
-        // 记录自适应心跳结果
-        if (typeof window !== 'undefined') {
-          const { adaptiveHeartbeatManager } = await import('@/lib/adaptive-heartbeat-manager');
-          adaptiveHeartbeatManager.recordHeartbeatResult(true, responseTime);
-        }
+      const response = await fetch(`/api/session/${sessionId}`);
+      if (response.ok) {
+        const sessionData = await response.json();
+        setSession(sessionData);
       } else {
-        console.warn("Heartbeat failed:", result.error);
-        stabilityEnhancerRef.current?.recordFailure(result.error || 'Heartbeat failed', 'heartbeat');
-        
-        // 记录自适应心跳结果
-        if (typeof window !== 'undefined') {
-          const { adaptiveHeartbeatManager } = await import('@/lib/adaptive-heartbeat-manager');
-          adaptiveHeartbeatManager.recordHeartbeatResult(false, responseTime);
-        }
-        
-        setIsConnected(false);
+        console.error('Failed to fetch session data:', response.status);
+        setSession(null);
       }
     } catch (error) {
-      console.error("Heartbeat error:", error);
-      const responseTime = Date.now() - startTime;
-      
-      stabilityEnhancerRef.current?.recordFailure(
-        error instanceof Error ? error.message : 'Heartbeat error',
-        'heartbeat'
-      );
-      
-      // 记录自适应心跳结果
-      if (typeof window !== 'undefined') {
-        const { adaptiveHeartbeatManager } = await import('@/lib/adaptive-heartbeat-manager');
-        adaptiveHeartbeatManager.recordHeartbeatResult(false, responseTime);
-      }
-      
-      setIsConnected(false);
+      console.error('Error fetching session data:', error);
+      setSession(null);
     }
-  }, [sessionId, currentUser]);
+  }, [sessionId]);
 
-  // 检查连接健康状态并尝试恢复
+  // 当连接建立时，获取初始会话数据
   useEffect(() => {
-    if (!stabilityEnhancerRef.current) return;
-    
-    const healthCheckInterval = setInterval(() => {
-      const health = stabilityEnhancerRef.current?.getHealth();
-      if (health && stabilityEnhancerRef.current?.shouldRecover()) {
-        console.log('Connection unhealthy, attempting recovery...');
-        stabilityEnhancerRef.current.startRecovery().then(() => {
-          // 恢复后重新轮询
-          pollSession();
-        });
-      }
-    }, 10000); // 每10秒检查一次健康状态
-    
-    return () => clearInterval(healthCheckInterval);
-  }, [pollSession]);
+    if (state.isConnected && sessionId && !session) {
+      fetchSessionData();
+    }
+  }, [state.isConnected, sessionId, session, fetchSessionData]);
 
+  // 定期轮询会话数据（作为备用机制）
   useEffect(() => {
-    if (!isJoined || isRestoring) return;
+    if (!isJoined || !sessionId || !state.isConnected) return;
+
+    const pollInterval = setInterval(() => {
+      fetchSessionData();
+    }, 5000); // 每5秒轮询一次
+
+    return () => clearInterval(pollInterval);
+  }, [isJoined, sessionId, state.isConnected, fetchSessionData]);
+
+  // 发送投票
+  const sendVote = useCallback(async (vote: string) => {
+    if (!sessionId || !currentUser) return;
     
-    // 立即执行一次轮询
-    pollSession();
+    try {
+      await sendMessage({
+        type: 'vote',
+        vote
+      });
+      // 投票后立即获取最新会话数据
+      setTimeout(() => fetchSessionData(), 500);
+    } catch (error) {
+      console.error('Failed to send vote:', error);
+    }
+  }, [sessionId, currentUser, sendMessage, fetchSessionData]);
+
+  // 发送显示投票请求
+  const sendReveal = useCallback(async () => {
+    if (!sessionId || !currentUser) return;
     
-    // 减少轮询频率，增加稳定性
-    const pollInterval = setInterval(pollSession, 3000); // 从2秒增加到3秒
-    const heartbeatInterval = setInterval(sendHeartbeat, 10000); // 从5秒增加到10秒
+    try {
+      await sendMessage({
+        type: 'reveal'
+      });
+      // 显示投票后立即获取最新会话数据
+      setTimeout(() => fetchSessionData(), 500);
+    } catch (error) {
+      console.error('Failed to send reveal:', error);
+    }
+  }, [sessionId, currentUser, sendMessage, fetchSessionData]);
+
+  // 发送重置投票请求
+  const sendReset = useCallback(async () => {
+    if (!sessionId || !currentUser) return;
     
-    return () => {
-      clearInterval(pollInterval);
-      clearInterval(heartbeatInterval);
-    };
-  }, [isJoined, isRestoring, pollSession, sendHeartbeat]);
+    try {
+      await sendMessage({
+        type: 'reset'
+      });
+      // 重置后立即获取最新会话数据
+      setTimeout(() => fetchSessionData(), 500);
+    } catch (error) {
+      console.error('Failed to send reset:', error);
+    }
+  }, [sessionId, currentUser, sendMessage, fetchSessionData]);
+
+  // 发送模板更新
+  const sendTemplateUpdate = useCallback(async (templateData: { type: string; customCards?: string }) => {
+    if (!sessionId || !currentUser) return;
+    
+    try {
+      await sendMessage({
+        type: 'template_update',
+        templateType: templateData.type,
+        customCards: templateData.customCards
+      });
+      // 模板更新后立即获取最新会话数据
+      setTimeout(() => fetchSessionData(), 500);
+    } catch (error) {
+      console.error('Failed to send template update:', error);
+    }
+  }, [sessionId, currentUser, sendMessage, fetchSessionData]);
+
+  // 兼容性方法 - 手动轮询
+  const pollSession = useCallback(async () => {
+    await fetchSessionData();
+  }, [fetchSessionData]);
+
+  const sendHeartbeat = useCallback(async () => {
+    // 连接管理器会自动处理心跳
+    console.log('Manual heartbeat not needed - handled by connection manager');
+  }, []);
 
   return {
     session,
     isJoined,
-    isConnected,
+    isConnected: state.isConnected,
     isLoading,
     setSession,
     setIsJoined,
-    setIsConnected,
+    setIsConnected: () => {}, // 连接状态由连接管理器管理
     setIsLoading,
     pollSession,
     sendHeartbeat,
+    // 新增的消息发送方法
+    sendVote,
+    sendReveal,
+    sendReset,
+    sendTemplateUpdate
   };
 }

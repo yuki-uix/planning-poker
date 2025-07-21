@@ -37,13 +37,24 @@ export class RedisSessionStore {
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT || '6379'),
       password: process.env.REDIS_PASSWORD,
-      maxRetriesPerRequest: 5, // 增加重试次数
+      maxRetriesPerRequest: 3, // 减少重试次数，避免堆积
       lazyConnect: true,
       enableOfflineQueue: true, // 启用离线队列
       enableReadyCheck: true,
-      // 新增超时配置
-      connectTimeout: 10000,
-      commandTimeout: 5000,
+      // 优化超时配置
+      connectTimeout: 15000, // 增加连接超时
+      commandTimeout: 10000, // 增加命令超时
+      // 添加健康检查
+      keepAlive: 30000,
+      family: 4,
+      // 添加重连配置
+      reconnectOnError: (err) => {
+        const targetError = 'READONLY';
+        if (err.message.includes(targetError)) {
+          return true;
+        }
+        return false;
+      },
     });
 
     // 增强错误处理
@@ -77,14 +88,14 @@ export class RedisSessionStore {
 
       const session = JSON.parse(sessionData) as SessionData;
       
-      // 更宽松的活跃用户检测（从60秒改为120秒）
+      // 更宽松的活跃用户检测（从120秒改为180秒）
       const now = Date.now();
       const activeUsers = session.users.filter(
-        (user) => now - user.lastSeen < 120000 // 2分钟
+        (user) => now - user.lastSeen < 180000 // 3分钟
       );
 
-      // 只有当用户数量显著减少时才清理
-      if (activeUsers.length < session.users.length * 0.8) {
+      // 只有当用户数量显著减少时才清理（从80%改为90%）
+      if (activeUsers.length < session.users.length * 0.9) {
         const updatedSession = { ...session, users: activeUsers };
         await this.redis.setex(
           `${this.SESSION_PREFIX}${sessionId}`, 
@@ -355,18 +366,28 @@ export class RedisSessionStore {
   }
 
   // 转移主持人权限
-  async transferHostRole(sessionId: string, currentHostId: string, newHostId: string): Promise<SessionData | null> {
+  async transferHostRole(sessionId: string, currentHostId: string): Promise<SessionData | null> {
     return this.updateSession(sessionId, (session) => {
       if (session.hostId !== currentHostId) {
         return session;
       }
 
+      // 找到第一个attendance用户
+      const firstAttendance = session.users.find(
+        (user) => user.role === "attendance" && user.id !== currentHostId
+      );
+
+      if (!firstAttendance) {
+        // 如果没有其他attendance用户，保持原会话不变
+        return session;
+      }
+
+      // 更新hostId和用户角色
       const updatedUsers = session.users.map((user) => {
-        if (user.id === currentHostId) {
-          return { ...user, role: "attendance" as UserRole };
-        }
-        if (user.id === newHostId) {
+        if (user.id === firstAttendance.id) {
           return { ...user, role: "host" as UserRole };
+        } else if (user.id === currentHostId) {
+          return { ...user, role: "attendance" as UserRole };
         }
         return user;
       });
@@ -374,7 +395,7 @@ export class RedisSessionStore {
       return {
         ...session,
         users: updatedUsers,
-        hostId: newHostId,
+        hostId: firstAttendance.id,
       };
     });
   }

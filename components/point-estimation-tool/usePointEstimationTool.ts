@@ -128,73 +128,42 @@ export function usePointEstimationTool(): PointEstimationToolState &
       )
         return;
       userState.setSelectedVote(vote);
-      await sessionActions.handleCastVote(
-        userState.sessionId,
-        userState.currentUser,
-        vote,
-        sessionState.session,
-        computedValues.canVote
-      );
+      await sessionState.sendVote(vote);
     },
-    [sessionState.session, userState, sessionActions, computedValues.canVote]
+    [sessionState, userState, computedValues.canVote]
   );
 
   // 处理显示投票
   const handleRevealVotes = useCallback(async () => {
     if (!sessionState.session || !computedValues.isHost) return;
-    await sessionActions.handleRevealVotes(
-      userState.sessionId,
-      userState.currentUser,
-      sessionState.session,
-      computedValues.isHost
-    );
-  }, [sessionState.session, userState, sessionActions, computedValues.isHost]);
+    await sessionState.sendReveal();
+  }, [sessionState, computedValues.isHost]);
 
   // 处理重置投票
   const handleResetVotes = useCallback(async () => {
     if (!sessionState.session || !computedValues.isHost) return;
-    await sessionActions.handleResetVotes(
-      userState.sessionId,
-      userState.currentUser,
-      sessionState.session,
-      computedValues.isHost,
-      userState.setSelectedVote,
-      sessionState.pollSession
-    );
-  }, [sessionState.session, userState, sessionActions, computedValues.isHost]);
+    await sessionState.sendReset();
+  }, [sessionState, computedValues.isHost]);
 
   // 处理模板变更
   const handleTemplateChange = useCallback(
     async (templateType: TemplateType) => {
       if (!sessionState.session || !computedValues.isHost) return;
-      await sessionActions.handleTemplateChange(
-        userState.sessionId,
-        userState.currentUser,
-        sessionState.session,
-        computedValues.isHost,
-        templateType,
-        userState.setSelectedVote,
-        sessionState.pollSession
-      );
+      await sessionState.sendTemplateUpdate({ type: templateType });
     },
-    [sessionState.session, userState, sessionActions, computedValues.isHost]
+    [sessionState, computedValues.isHost]
   );
 
   // 处理自定义卡片变更
   const handleCustomCardsChange = useCallback(
     async (newCustomCards: string) => {
       if (!sessionState.session || !computedValues.isHost) return;
-      await sessionActions.handleCustomCardsChange(
-        userState.sessionId,
-        userState.currentUser,
-        sessionState.session,
-        computedValues.isHost,
-        newCustomCards,
-        userState.setSelectedVote,
-        sessionState.pollSession
-      );
+      await sessionState.sendTemplateUpdate({ 
+        type: 'custom', 
+        customCards: newCustomCards 
+      });
     },
-    [sessionState.session, userState, sessionActions, computedValues.isHost]
+    [sessionState, computedValues.isHost]
   );
 
   // 处理登出

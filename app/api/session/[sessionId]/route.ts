@@ -5,10 +5,10 @@ import { Session } from '@/types/estimation';
 // 获取会话信息（用于HTTP轮询）
 export async function GET(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  context: { params: Promise<{ sessionId: string }> }
 ) {
   try {
-    const sessionId = params.sessionId;
+    const { sessionId } = await context.params;
     
     if (!sessionId) {
       return NextResponse.json(
@@ -17,10 +17,10 @@ export async function GET(
       );
     }
 
-    // 从Redis获取会话信息，增加重试机制
+    // 从Redis获取会话信息，优化重试机制
     let session: Session | null = null;
     let retries = 0;
-    const maxRetries = 3;
+    const maxRetries = 2; // 减少重试次数
 
     while (retries < maxRetries) {
       try {
@@ -31,8 +31,11 @@ export async function GET(
         console.error(`Failed to get session (attempt ${retries}/${maxRetries}):`, error);
         
         if (retries < maxRetries) {
-          // 指数退避重试
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 1000));
+          // 指数退避 + 随机化重试
+          const baseDelay = Math.pow(2, retries) * 1000;
+          const jitter = Math.random() * 1000;
+          const delay = baseDelay + jitter;
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
     }
@@ -59,10 +62,10 @@ export async function GET(
 // 处理会话操作（用于HTTP POST消息）
 export async function POST(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  context: { params: Promise<{ sessionId: string }> }
 ) {
   try {
-    const sessionId = params.sessionId;
+    const { sessionId } = await context.params;
     const body = await request.json();
     const { type, userId, data } = body;
 
@@ -73,10 +76,10 @@ export async function POST(
       );
     }
 
-    // 获取会话，增加重试机制
+    // 获取会话，优化重试机制
     let session: Session | null = null;
     let retries = 0;
-    const maxRetries = 3;
+    const maxRetries = 2; // 减少重试次数
 
     while (retries < maxRetries) {
       try {
@@ -87,7 +90,11 @@ export async function POST(
         console.error(`Failed to get session for POST (attempt ${retries}/${maxRetries}):`, error);
         
         if (retries < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 1000));
+          // 指数退避 + 随机化重试
+          const baseDelay = Math.pow(2, retries) * 1000;
+          const jitter = Math.random() * 1000;
+          const delay = baseDelay + jitter;
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
     }
@@ -136,9 +143,9 @@ export async function POST(
         );
     }
 
-    // 更新会话，增加重试机制
+    // 更新会话，优化重试机制
     let updateRetries = 0;
-    const maxUpdateRetries = 3;
+    const maxUpdateRetries = 2; // 减少重试次数
 
     while (updateRetries < maxUpdateRetries) {
       try {
@@ -154,7 +161,11 @@ export async function POST(
         console.error(`Failed to update session (attempt ${updateRetries}/${maxUpdateRetries}):`, error);
         
         if (updateRetries < maxUpdateRetries) {
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, updateRetries) * 1000));
+          // 指数退避 + 随机化重试
+          const baseDelay = Math.pow(2, updateRetries) * 1000;
+          const jitter = Math.random() * 1000;
+          const delay = baseDelay + jitter;
+          await new Promise(resolve => setTimeout(resolve, delay));
         } else {
           throw error;
         }

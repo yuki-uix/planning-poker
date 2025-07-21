@@ -1,13 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { redisSessionStore } from '@/lib/redis-session-store';
 import { connectionStabilityMonitor } from '@/lib/connection-stability-monitor';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const sessionId = searchParams.get('sessionId');
-    const userId = searchParams.get('userId');
-
     // 检查Redis连接
     let redisStatus = 'unknown';
     try {
@@ -18,17 +14,7 @@ export async function GET(request: NextRequest) {
       console.error('Redis connection check failed:', error);
     }
 
-    // 获取会话信息
-    let sessionInfo = null;
-    if (sessionId) {
-      try {
-        sessionInfo = await redisSessionStore.getSession(sessionId);
-      } catch (error) {
-        console.error('Failed to get session info:', error);
-      }
-    }
-
-    // 获取连接统计
+    // 获取连接稳定性报告
     const stabilityReport = connectionStabilityMonitor.getStabilityReport();
 
     return NextResponse.json({
@@ -37,17 +23,13 @@ export async function GET(request: NextRequest) {
       redis: {
         status: redisStatus
       },
-      session: sessionInfo ? {
-        id: sessionInfo.id,
-        userCount: sessionInfo.users.length,
-        createdAt: sessionInfo.createdAt,
-        revealed: sessionInfo.revealed
-      } : null,
-      stability: stabilityReport,
-      user: userId ? {
-        id: userId,
-        inSession: sessionInfo?.users.some(u => u.id === userId) || false
-      } : null
+      stability: {
+        totalDisconnections: stabilityReport.totalDisconnections,
+        recentDisconnections: stabilityReport.recentDisconnections,
+        totalConnectionAttempts: stabilityReport.totalConnectionAttempts,
+        recentSuccessfulConnections: stabilityReport.recentSuccessfulConnections,
+        averageDisconnectionInterval: Math.round(stabilityReport.averageDisconnectionInterval / 1000)
+      }
     });
   } catch (error) {
     console.error('Failed to get connection info:', error);
