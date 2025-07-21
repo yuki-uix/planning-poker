@@ -12,7 +12,7 @@ const nextConfig = {
         tls: false,
         dns: false,
         fs: false,
-        path: false,
+        // 移除 path: false，避免影响路径解析
         os: false,
         crypto: false,
         stream: false,

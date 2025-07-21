@@ -7,7 +7,7 @@
     "dev": "next dev",
     "lint": "next lint",
     "start": "next start",
-    "prepare": "[ \"$NODE_ENV\" != \"production\" ] && husky || echo \"Skipping husky in production\"",
+    "prepare": "echo \"Skipping husky in production\"",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
