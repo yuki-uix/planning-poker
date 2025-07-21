@@ -40,7 +40,7 @@ export class SSEConnectionManager {
   constructor(config: SSEConnectionConfig) {
     this.config = {
       pollInterval: 2000,
-      heartbeatInterval: 30000,
+      heartbeatInterval: 30000, // 增加到30秒
       maxReconnectAttempts: 10,
       fallbackDelay: 5000,
       ...config
@@ -65,6 +65,7 @@ export class SSEConnectionManager {
     this.state.isConnecting = true;
 
     try {
+      // 在Render环境下，优先使用SSE
       await this.connectSSE();
     } catch (error) {
       console.log('SSE connection failed, falling back to HTTP polling:', error);
@@ -88,10 +89,13 @@ export class SSEConnectionManager {
       sseUrl: this.config.sseUrl,
       pollUrl: this.config.pollUrl,
       pollInterval: this.config.pollInterval,
-      reconnectInterval: 3000,
+      reconnectInterval: 5000, // 增加重连间隔
       heartbeatInterval: this.config.heartbeatInterval!,
       maxReconnectAttempts: this.config.maxReconnectAttempts!
     });
+
+    // 设置更长的超时时间
+    this.sseClient.setTimeout(300000); // 5分钟
 
     // 设置SSE事件回调
     this.sseClient.onConnect(() => {

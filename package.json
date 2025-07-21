@@ -14,7 +14,9 @@
     "check-prod": "node scripts/check-production-config.js",
     "debug-connection": "curl -s http://localhost/api/debug/connection | jq .",
     "vercel-build": "next build",
-    "vercel-dev": "next dev"
+    "vercel-dev": "next dev",
+    "render-build": "npm ci && npm run build",
+    "render-start": "npm start"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

@@ -39,6 +39,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Render支持更长的连接时间，可以延长到5分钟
+  const SSE_TIMEOUT = 300000; // 5分钟
+  const HEARTBEAT_INTERVAL = 30000; // 30秒
+  const SESSION_CHECK_INTERVAL = 15000; // 15秒
+
   // 设置 SSE 响应头
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -107,11 +112,11 @@ export async function GET(request: NextRequest) {
           timestamp: Date.now()
         });
 
-        // 设置心跳（每 25 秒）
-        heartbeatInterval = setInterval(sendHeartbeat, 25000);
+        // 设置心跳（每 30 秒）
+        heartbeatInterval = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
 
-        // 设置会话检查（每 10 秒）
-        sessionCheckInterval = setInterval(checkSession, 10000);
+        // 设置会话检查（每 15 秒）
+        sessionCheckInterval = setInterval(checkSession, SESSION_CHECK_INTERVAL);
 
         // 立即检查一次会话状态
         await checkSession();
@@ -139,14 +144,14 @@ export async function GET(request: NextRequest) {
         controller.close();
       });
 
-      // 设置超时保护（55 秒，避免 Vercel 60 秒限制）
+      // Render支持更长的超时时间
       setTimeout(() => {
         if (isConnected) {
           console.log('SSE connection timeout');
           cleanup();
           controller.close();
         }
-      }, 55000);
+      }, SSE_TIMEOUT);
 
     }
   });

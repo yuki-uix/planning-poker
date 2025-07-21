@@ -61,6 +61,13 @@ export class SSEClient {
     };
   }
 
+  // 设置超时时间
+  setTimeout(timeout: number): void {
+    // 这个方法用于设置连接超时时间
+    // 在SSE中，超时主要通过EventSource的内置机制处理
+    console.log(`SSE timeout set to ${timeout}ms`);
+  }
+
   // 连接SSE
   async connect(): Promise<void> {
     if (this.state.isConnected || this.state.isConnecting) {

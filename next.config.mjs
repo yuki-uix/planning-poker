@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // 启用standalone输出，优化部署
+  output: 'standalone',
+  
   webpack: (config, { isServer }) => {
     if (!isServer) {
       // 在客户端构建中排除服务器端模块
