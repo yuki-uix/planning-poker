@@ -149,6 +149,63 @@ export class SSEConnectionManager {
     this.state.isConnected = true;
     this.state.isConnecting = false;
     this.onConnectionTypeChangeCallback?.('http');
+    
+    // 启动HTTP轮询
+    this.startHttpPolling();
+  }
+  
+  // 启动HTTP轮询
+  private startHttpPolling(): void {
+    const pollInterval = setInterval(async () => {
+      if (this.isManualClose) {
+        clearInterval(pollInterval);
+        return;
+      }
+      
+      try {
+        const response = await fetch(this.config.pollUrl);
+        if (response.ok) {
+          const sessionData = await response.json();
+          if (sessionData.id && sessionData.users && this.onSessionUpdateCallback) {
+            this.onSessionUpdateCallback(sessionData);
+          }
+          this.state.lastHeartbeat = Date.now();
+          
+          // 更新用户心跳
+          await this.updateUserHeartbeat();
+        } else {
+          // 如果session不存在，继续轮询但不更新心跳
+          // 减少日志输出频率，避免刷屏
+          if (Math.random() < 0.1) { // 只有10%的概率输出日志
+            console.log('Session not found during HTTP polling, continuing...');
+          }
+        }
+      } catch (error) {
+        console.error('HTTP polling error:', error);
+        // 不要因为网络错误而断开连接
+      }
+    }, this.config.pollInterval);
+    
+    // 立即执行一次
+    pollInterval.refresh();
+  }
+  
+  // 更新用户心跳
+  private async updateUserHeartbeat(): Promise<void> {
+    try {
+      await fetch(`/api/session/${this.config.sessionId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'heartbeat',
+          userId: this.config.userId
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to update heartbeat:', error);
+    }
   }
 
   // 处理消息
@@ -166,8 +223,19 @@ export class SSEConnectionManager {
       case 'heartbeat_ack':
         this.state.lastHeartbeat = Date.now();
         break;
+      case 'session_not_found':
+        console.log('Session not found in SSE, falling back to HTTP polling');
+        this.fallbackToHttp();
+        break;
+      case 'session_expired':
+        console.log('Session expired in SSE, falling back to HTTP polling');
+        this.fallbackToHttp();
+        break;
       default:
-        console.log('Received message:', message);
+        // 减少日志输出频率，避免刷屏
+        if (Math.random() < 0.05) { // 只有5%的概率输出日志
+          console.log('Received message:', message);
+        }
     }
   }
 
@@ -175,8 +243,34 @@ export class SSEConnectionManager {
   send(message: Omit<SSEMessage, 'timestamp'>): void {
     if (this.sseClient) {
       this.sseClient.send(message);
+    } else if (this.state.connectionType === 'http') {
+      // HTTP模式下，通过API发送消息
+      this.sendViaHttp(message);
     } else {
       console.warn('No active connection, message not sent');
+    }
+  }
+  
+  // 通过HTTP发送消息
+  private async sendViaHttp(message: Omit<SSEMessage, 'timestamp'>): Promise<void> {
+    try {
+      const response = await fetch(`/api/session/${this.config.sessionId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: message.type,
+          userId: this.config.userId,
+          data: message.data
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send message via HTTP');
+      }
+    } catch (error) {
+      console.error('Failed to send message via HTTP:', error);
     }
   }
 

@@ -410,8 +410,9 @@ export class RedisSessionStore {
         const sessionData = await this.redis.get(key);
         if (sessionData) {
           const session = JSON.parse(sessionData) as SessionData;
+          // 增加活跃用户检测时间到10分钟
           const activeUsers = session.users.filter(
-            (user) => now - user.lastSeen < 60000
+            (user) => now - user.lastSeen < 600000 // 10分钟
           );
           
           if (activeUsers.length === 0) {
@@ -464,4 +465,4 @@ export const redisSessionStore = new RedisSessionStore();
 // 定期清理过期会话
 setInterval(() => {
   redisSessionStore.cleanupExpiredSessions();
-}, 60000); // 每分钟清理一次 
+}, 300000); // 每5分钟清理一次 

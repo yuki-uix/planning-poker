@@ -3,7 +3,7 @@
 // 确保连接的稳定性和可靠性
 
 export interface SSEMessage {
-  type: 'session_update' | 'heartbeat_ack' | 'user_joined' | 'user_left' | 'vote_received' | 'heartbeat' | 'vote' | 'reveal' | 'reset' | 'template_update';
+  type: 'session_update' | 'heartbeat_ack' | 'user_joined' | 'user_left' | 'vote_received' | 'heartbeat' | 'vote' | 'reveal' | 'reset' | 'template_update' | 'session_not_found' | 'session_expired' | 'connected' | 'error';
   sessionId: string;
   userId?: string;
   data?: Record<string, unknown>;
@@ -65,7 +65,10 @@ export class SSEClient {
   setTimeout(timeout: number): void {
     // 这个方法用于设置连接超时时间
     // 在SSE中，超时主要通过EventSource的内置机制处理
-    console.log(`SSE timeout set to ${timeout}ms`);
+    // 减少日志输出频率
+    if (Math.random() < 0.1) { // 只有10%的概率输出日志
+      console.log(`SSE timeout set to ${timeout}ms`);
+    }
   }
 
   // 连接SSE
@@ -92,7 +95,10 @@ export class SSEClient {
         this.eventSource = new EventSource(this.config.sseUrl);
 
         this.eventSource.onopen = () => {
-          console.log('SSE connected');
+          // 减少连接成功的日志输出频率
+          if (Math.random() < 0.3) { // 只有30%的概率输出日志
+            console.log('SSE connected');
+          }
           this.state.isConnected = true;
           this.state.isConnecting = false;
           this.state.connectionType = 'sse';
@@ -106,6 +112,17 @@ export class SSEClient {
         this.eventSource.onmessage = (event) => {
           try {
             const message: SSEMessage = JSON.parse(event.data);
+            
+            // 处理特殊消息类型
+            if (message.type === 'session_not_found') {
+              // 减少特殊消息的日志输出频率
+              if (Math.random() < 0.2) { // 只有20%的概率输出日志
+                console.log('Session not found, falling back to HTTP polling');
+              }
+              this.fallbackToHttp();
+              return;
+            }
+            
             this.onMessageCallback?.(message);
           } catch (error) {
             console.error('Failed to parse SSE message:', error);
@@ -171,27 +188,32 @@ export class SSEClient {
     try {
       const response = await fetch(this.config.pollUrl);
       if (response.ok) {
-        const data = await response.json();
-        if (data.type === 'session_update') {
-          this.onMessageCallback?.(data);
+        const sessionData = await response.json();
+        // session API直接返回session数据，需要包装成SSE消息格式
+        if (sessionData.id && sessionData.users) {
+          const message: SSEMessage = {
+            type: 'session_update',
+            sessionId: sessionData.id,
+            data: sessionData,
+            timestamp: Date.now()
+          };
+          this.onMessageCallback?.(message);
         }
         this.state.lastHeartbeat = Date.now();
       } else {
-        throw new Error('Session not found');
+        // 如果session不存在，不要立即断开连接，继续轮询
+        // 减少日志输出频率，避免刷屏
+        if (Math.random() < 0.1) { // 只有10%的概率输出日志
+          console.log('Session not found during polling, continuing...');
+        }
+        this.state.lastHeartbeat = Date.now();
       }
     } catch (error) {
       console.error('HTTP polling failed:', error);
       this.onErrorCallback?.(error);
       
-      // 如果HTTP轮询也失败，尝试重新连接SSE
-      if (this.state.reconnectAttempts < this.config.maxReconnectAttempts!) {
-        this.state.reconnectAttempts++;
-        setTimeout(() => {
-          this.connectSSE().catch(() => {
-            // SSE连接失败，继续HTTP轮询
-          });
-        }, this.config.reconnectInterval);
-      }
+      // HTTP轮询失败时，不要尝试重新连接SSE，避免无限循环
+      // 继续HTTP轮询，等待下次轮询
     }
   }
 
@@ -211,14 +233,21 @@ export class SSEClient {
   // 通过HTTP发送消息
   private async sendViaHttp(message: Omit<SSEMessage, 'timestamp'>): Promise<void> {
     try {
-      const response = await fetch('/api/session/action', {
+      // 从pollUrl中提取sessionId
+      const sessionId = this.config.pollUrl.split('/').pop();
+      if (!sessionId) {
+        throw new Error('Cannot extract sessionId from pollUrl');
+      }
+      
+      const response = await fetch(`/api/session/${sessionId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...message,
-          timestamp: Date.now()
+          type: message.type,
+          userId: message.userId,
+          data: message.data
         }),
       });
 

@@ -202,7 +202,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
     selectedRole: userState.selectedRole,
     session: sessionState.session,
     selectedVote: userState.selectedVote,
-    isJoined: sessionState.isJoined,
+    isJoined: userState.isJoined,
     isConnected: sessionState.isConnected,
     isLoading: sessionState.isLoading,
     copied: uiState.copied,
@@ -227,12 +227,6 @@ export function usePointEstimationTool(): PointEstimationToolState &
     canVote: computedValues.canVote,
     currentUserData: computedValues.currentUserData,
   };
-  console.log("usePointEstimationTool", {
-    session: sessionState.session,
-    isJoined: sessionState.isJoined,
-    isRestoring: userState.isRestoring,
-    currentUser: userState.currentUser,
-    sessionId: userState.sessionId,
-  });
+
   return resultObj;
 }

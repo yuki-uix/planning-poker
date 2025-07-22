@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { SSEConnectionManager, SSEConnectionConfig } from '@/lib/sse-connection-manager';
+import { SSEConnectionManager } from '@/lib/sse-connection-manager';
 import { SSEMessage } from '@/lib/sse-client';
 import { Session } from '@/types/estimation';
 
@@ -39,9 +39,16 @@ export function useSSEConnectionManager({
   });
 
   const connectionManagerRef = useRef<SSEConnectionManager | null>(null);
+  const stateUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitializedRef = useRef(false);
 
-  // 初始化连接管理器
+  // 初始化连接管理器 - 使用 useRef 避免依赖项变化
   const initConnectionManager = useCallback(() => {
+    // 避免重复初始化
+    if (isInitializedRef.current && connectionManagerRef.current) {
+      return;
+    }
+
     if (connectionManagerRef.current) {
       connectionManagerRef.current.disconnect();
     }
@@ -66,13 +73,19 @@ export function useSSEConnectionManager({
     });
 
     connectionManagerRef.current.onConnect(() => {
-      console.log('SSE connection established');
+      // 减少连接建立的日志输出频率
+      if (Math.random() < 0.3) { // 只有30%的概率输出日志
+        console.log('SSE connection established');
+      }
       setConnectionState(prev => ({ ...prev, isConnected: true, isConnecting: false }));
       onConnect?.();
     });
 
     connectionManagerRef.current.onDisconnect(() => {
-      console.log('SSE connection lost');
+      // 减少连接断开的日志输出频率
+      if (Math.random() < 0.3) { // 只有30%的概率输出日志
+        console.log('SSE connection lost');
+      }
       setConnectionState(prev => ({ ...prev, isConnected: false }));
       onDisconnect?.();
     });
@@ -83,20 +96,27 @@ export function useSSEConnectionManager({
     });
 
     connectionManagerRef.current.onConnectionTypeChange((type: 'sse' | 'http') => {
-      console.log('SSE connection type changed to:', type);
+      // 减少连接类型变化的日志输出频率
+      if (Math.random() < 0.2) { // 只有20%的概率输出日志
+        console.log('SSE connection type changed to:', type);
+      }
       setConnectionState(prev => ({ ...prev, connectionType: type }));
       onConnectionTypeChange?.(type);
     });
 
-    // 定期更新连接状态
-    const stateUpdateInterval = setInterval(() => {
+    // 定期更新连接状态（减少频率，避免频繁重新渲染）
+    if (stateUpdateIntervalRef.current) {
+      clearInterval(stateUpdateIntervalRef.current);
+    }
+    
+    stateUpdateIntervalRef.current = setInterval(() => {
       if (connectionManagerRef.current) {
         setConnectionState(connectionManagerRef.current.getState());
       }
-    }, 1000);
+    }, 10000); // 改为10秒更新一次，减少频率
 
-    return () => clearInterval(stateUpdateInterval);
-  }, [sessionId, userId, onSessionUpdate, onConnect, onDisconnect, onError, onConnectionTypeChange]);
+    isInitializedRef.current = true;
+  }, [sessionId, userId]); // 只依赖 sessionId 和 userId
 
   // 连接
   const connect = useCallback(async () => {
@@ -164,25 +184,36 @@ export function useSSEConnectionManager({
     });
   }, [sendMessage, sessionId, userId]);
 
-  // 组件挂载时初始化连接管理器
+  // 组件挂载时初始化连接管理器并连接
   useEffect(() => {
-    if (sessionId && userId) {
-      const cleanup = initConnectionManager();
-      return cleanup;
+    if (sessionId && userId && !isInitializedRef.current) {
+      initConnectionManager();
+      
+      // 延迟连接，确保连接管理器已初始化
+      const connectTimer = setTimeout(() => {
+        if (connectionManagerRef.current) {
+          connect();
+        }
+      }, 100);
+      
+      return () => {
+        clearTimeout(connectTimer);
+      };
     }
-  }, [sessionId, userId, initConnectionManager]);
+  }, [sessionId, userId, initConnectionManager, connect]);
 
-  // 组件挂载时连接
+  // 清理函数
   useEffect(() => {
-    if (sessionId && userId && connectionManagerRef.current) {
-      connect();
-    }
-
-    // 组件卸载时断开连接
     return () => {
-      disconnect();
+      if (stateUpdateIntervalRef.current) {
+        clearInterval(stateUpdateIntervalRef.current);
+      }
+      if (connectionManagerRef.current) {
+        connectionManagerRef.current.disconnect();
+      }
+      isInitializedRef.current = false;
     };
-  }, [sessionId, userId, connect, disconnect]);
+  }, []);
 
   return {
     // 连接状态
