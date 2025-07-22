@@ -195,7 +195,15 @@ async function handleVote(session: Session, userId: string, vote: string) {
     throw new Error('Cannot vote after results are revealed');
   }
 
+  // 更新用户投票状态
+  const updatedUsers = session.users.map(u => 
+    u.id === userId 
+      ? { ...u, vote, hasVoted: true, lastSeen: Date.now() }
+      : u
+  );
+
   // 更新投票
+  session.users = updatedUsers;
   session.votes[userId] = vote;
   session.lastUpdated = Date.now();
 }
@@ -218,6 +226,15 @@ async function handleReset(session: Session, userId: string) {
     throw new Error('Only the host can reset votes');
   }
 
+  // 重置所有用户的投票状态
+  const updatedUsers = session.users.map(user => ({
+    ...user,
+    vote: null,
+    hasVoted: false,
+    lastSeen: Date.now(),
+  }));
+
+  session.users = updatedUsers;
   session.votes = {};
   session.revealed = false;
   session.lastUpdated = Date.now();
@@ -234,6 +251,17 @@ async function handleTemplateUpdate(
     throw new Error('Only the host can update template');
   }
 
+  // 清除所有用户的投票记录
+  const updatedUsers = session.users.map((user) => ({
+    ...user,
+    vote: null,
+    hasVoted: false,
+    lastSeen: Date.now(),
+  }));
+
+  session.users = updatedUsers;
+  session.votes = {};
+  session.revealed = false;
   session.template = {
     type: templateData.type,
     customCards: templateData.customCards
@@ -244,9 +272,12 @@ async function handleTemplateUpdate(
 // 处理心跳
 async function handleHeartbeat(session: Session, userId: string) {
   // 更新用户最后活跃时间
-  const user = session.users.find(u => u.id === userId);
-  if (user) {
-    user.lastActive = Date.now();
-  }
+  const updatedUsers = session.users.map(u => 
+    u.id === userId 
+      ? { ...u, lastSeen: Date.now() }
+      : u
+  );
+  
+  session.users = updatedUsers;
   session.lastUpdated = Date.now();
 } 
