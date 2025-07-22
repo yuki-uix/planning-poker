@@ -1,5 +1,6 @@
-// 持久化存储工具
-// 提供更稳定的数据存储机制，包括错误处理、重试机制和数据验证
+// 会话存储工具
+// 提供基于 sessionStorage 的数据存储机制，包括错误处理、重试机制和数据验证
+// 数据会在浏览器标签页关闭时自动清理
 
 export interface PersistentData {
   userId: string;
@@ -29,14 +30,14 @@ const STORAGE_EXPIRY = 24 * 60 * 60 * 1000; // 24小时过期
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_DELAY = 100; // 毫秒
 
-// 检查浏览器是否支持localStorage
-function isLocalStorageAvailable(): boolean {
+// 检查浏览器是否支持sessionStorage
+function isSessionStorageAvailable(): boolean {
   if (typeof window === "undefined") return false;
 
   try {
-    const test = "__localStorage_test__";
-    localStorage.setItem(test, test);
-    localStorage.removeItem(test);
+    const test = "__sessionStorage_test__";
+    sessionStorage.setItem(test, test);
+    sessionStorage.removeItem(test);
     return true;
   } catch {
     return false;
@@ -103,20 +104,20 @@ function isDataExpired(timestamp: number): boolean {
 
 // 清理过期数据
 function cleanupExpiredData(): void {
-  if (!isLocalStorageAvailable()) return;
+  if (!isSessionStorageAvailable()) return;
 
   try {
     Object.values(STORAGE_KEYS).forEach((key) => {
-      const data = localStorage.getItem(key);
+      const data = sessionStorage.getItem(key);
       if (data) {
         try {
           const parsed = JSON.parse(data);
           if (parsed.timestamp && isDataExpired(parsed.timestamp)) {
-            localStorage.removeItem(key);
+            sessionStorage.removeItem(key);
           }
         } catch {
           // 如果解析失败，删除损坏的数据
-          localStorage.removeItem(key);
+          sessionStorage.removeItem(key);
         }
       }
     });
@@ -129,8 +130,8 @@ function cleanupExpiredData(): void {
 export async function saveUserData(
   data: Omit<PersistentData, "timestamp" | "version">
 ): Promise<void> {
-  if (!isLocalStorageAvailable()) {
-    console.warn("localStorage is not available");
+  if (!isSessionStorageAvailable()) {
+    console.warn("sessionStorage is not available");
     return;
   }
 
@@ -144,13 +145,13 @@ export async function saveUserData(
 
   try {
     await withRetry(() => {
-      localStorage.setItem(
+      sessionStorage.setItem(
         STORAGE_KEYS.USER_INFO,
         JSON.stringify(persistentData)
       );
 
       // 同时保存备份
-      localStorage.setItem(
+      sessionStorage.setItem(
         STORAGE_KEYS.BACKUP,
         JSON.stringify({
           ...persistentData,
@@ -166,16 +167,16 @@ export async function saveUserData(
 
 // 获取用户数据
 export async function getUserData(): Promise<PersistentData | null> {
-  if (!isLocalStorageAvailable()) return null;
+  if (!isSessionStorageAvailable()) return null;
 
   try {
     const data = await withRetry(() => {
       // 首先尝试从主存储获取
-      let stored = localStorage.getItem(STORAGE_KEYS.USER_INFO);
+      let stored = sessionStorage.getItem(STORAGE_KEYS.USER_INFO);
 
       // 如果主存储失败，尝试从备份恢复
       if (!stored) {
-        stored = localStorage.getItem(STORAGE_KEYS.BACKUP);
+        stored = sessionStorage.getItem(STORAGE_KEYS.BACKUP);
         if (stored) {
           console.log("Recovered data from backup");
         }
@@ -209,7 +210,7 @@ export async function getUserData(): Promise<PersistentData | null> {
 
 // 更新用户投票
 export async function updateUserVote(vote: string | null): Promise<void> {
-  if (!isLocalStorageAvailable()) return;
+  if (!isSessionStorageAvailable()) return;
 
   try {
     const currentData = await getUserData();
@@ -235,7 +236,7 @@ export async function updateSessionState(
     };
   }
 ): Promise<void> {
-  if (!isLocalStorageAvailable()) return;
+  if (!isSessionStorageAvailable()) return;
 
   try {
     const currentData = await getUserData();
@@ -248,7 +249,7 @@ export async function updateSessionState(
 
     // 同时保存独立的会话状态
     await withRetry(() => {
-      localStorage.setItem(
+      sessionStorage.setItem(
         STORAGE_KEYS.SESSION_STATE,
         JSON.stringify({
           sessionId,
@@ -266,18 +267,18 @@ export async function updateSessionState(
 // 获取会话状态
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getSessionState(sessionId: string): Promise<any> {
-  if (!isLocalStorageAvailable()) return null;
+  if (!isSessionStorageAvailable()) return null;
 
   try {
     const data = await withRetry(() =>
-      localStorage.getItem(STORAGE_KEYS.SESSION_STATE)
+      sessionStorage.getItem(STORAGE_KEYS.SESSION_STATE)
     );
     if (!data) return null;
 
     const parsed = JSON.parse(data);
 
     if (parsed.sessionId !== sessionId || isDataExpired(parsed.timestamp)) {
-      localStorage.removeItem(STORAGE_KEYS.SESSION_STATE);
+      sessionStorage.removeItem(STORAGE_KEYS.SESSION_STATE);
       return null;
     }
 
@@ -290,11 +291,11 @@ export async function getSessionState(sessionId: string): Promise<any> {
 
 // 清除所有数据
 export function clearAllData(): void {
-  if (!isLocalStorageAvailable()) return;
+  if (!isSessionStorageAvailable()) return;
 
   try {
     Object.values(STORAGE_KEYS).forEach((key) => {
-      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
     });
   } catch (error) {
     console.error("Failed to clear all data:", error);
@@ -308,7 +309,7 @@ export function getStorageInfo(): {
   total: number;
   percentage: number;
 } {
-  if (!isLocalStorageAvailable()) {
+  if (!isSessionStorageAvailable()) {
     return {
       available: false,
       used: 0,
@@ -320,7 +321,7 @@ export function getStorageInfo(): {
   try {
     let used = 0;
     Object.values(STORAGE_KEYS).forEach((key) => {
-      const data = localStorage.getItem(key);
+      const data = sessionStorage.getItem(key);
       if (data) {
         used += new Blob([data]).size;
       }
@@ -349,7 +350,7 @@ export function getStorageInfo(): {
 
 // 数据迁移工具（从旧版本迁移到新版本）
 export async function migrateFromOldStorage(): Promise<void> {
-  if (!isLocalStorageAvailable()) return;
+  if (!isSessionStorageAvailable()) return;
 
   try {
     const oldKeys = [
