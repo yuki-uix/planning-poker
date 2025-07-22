@@ -8,7 +8,7 @@ import {
   revealVotes,
   resetVotes,
   updateTemplate,
-  transferHost,
+  leaveSession,
 } from "@/app/actions";
 import { saveUserData, updateUserVote } from "@/lib/persistence";
 
@@ -186,11 +186,13 @@ export function useSessionActions(): SessionActions {
   const handleLogout = useCallback(async (
     sessionId: string,
     currentUser: string,
-    isHost: boolean
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _isHost: boolean
   ): Promise<void> => {
-    if (isHost && sessionId && currentUser) {
+    if (sessionId && currentUser) {
       try {
-        await transferHost(sessionId, currentUser);
+        // 直接从会话中移除用户
+        await leaveSession(sessionId, currentUser);
       } catch {}
     }
   }, []);

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Session } from "@/types/estimation";
 import { useSSEConnectionManager } from "@/hooks/use-sse-connection-manager";
+import { leaveSession } from "@/app/actions";
 
 export interface SessionState {
   session: Session | null;
@@ -34,6 +35,7 @@ export function useSessionState(
   const [isLoading, setIsLoading] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastFetchTimeRef = useRef<number>(0);
+  const hasLeftSessionRef = useRef<boolean>(false);
 
   // 使用SSE连接管理器
   const { 
@@ -51,6 +53,78 @@ export function useSessionState(
       setSession(session);
     }
   });
+
+  // 处理用户离开会话
+  const handleUserLeave = useCallback(async () => {
+    if (sessionId && currentUser && isJoined && !hasLeftSessionRef.current) {
+      hasLeftSessionRef.current = true;
+      try {
+        await leaveSession(sessionId, currentUser);
+      } catch (error) {
+        console.error('Failed to leave session:', error);
+      }
+    }
+  }, [sessionId, currentUser, isJoined]);
+
+  // 标签页关闭检测
+  useEffect(() => {
+    if (!isJoined || !sessionId || !currentUser) return;
+
+    let leaveTimeout: NodeJS.Timeout | null = null;
+
+    const handleBeforeUnload = (
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      _event: BeforeUnloadEvent
+    ) => {
+      // 在页面卸载前尝试离开会话
+      handleUserLeave();
+    };
+
+    const handlePageHide = (event: PageTransitionEvent) => {
+      // 当页面隐藏时（包括关闭标签页、刷新等）
+      if (event.persisted === false) {
+        handleUserLeave();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      // 当页面变为不可见时
+      if (document.visibilityState === 'hidden') {
+        // 清除之前的定时器
+        if (leaveTimeout) {
+          clearTimeout(leaveTimeout);
+        }
+        
+        // 延迟执行，给用户一些时间重新打开标签页
+        leaveTimeout = setTimeout(() => {
+          if (document.visibilityState === 'hidden') {
+            handleUserLeave();
+          }
+        }, 10000); // 10秒延迟，给用户更多时间
+      } else {
+        // 页面重新可见，清除定时器
+        if (leaveTimeout) {
+          clearTimeout(leaveTimeout);
+          leaveTimeout = null;
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      
+      // 清理定时器
+      if (leaveTimeout) {
+        clearTimeout(leaveTimeout);
+      }
+    };
+  }, [isJoined, sessionId, currentUser, handleUserLeave]);
 
   // 手动获取会话数据的函数
   const fetchSessionData = useCallback(async () => {

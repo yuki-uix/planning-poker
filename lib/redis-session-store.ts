@@ -82,32 +82,13 @@ export class RedisSessionStore {
     });
   }
 
-  // 获取会话 - 优化清理逻辑
+  // 获取会话 - 移除不活跃用户清理逻辑
   async getSession(sessionId: string): Promise<SessionData | null> {
     try {
       const sessionData = await this.redis.get(`${this.SESSION_PREFIX}${sessionId}`);
       if (!sessionData) return null;
 
       const session = JSON.parse(sessionData) as SessionData;
-      
-      // 更宽松的活跃用户检测（从120秒改为180秒）
-      const now = Date.now();
-      const activeUsers = session.users.filter(
-        (user) => now - user.lastSeen < 180000 // 3分钟
-      );
-
-      // 只有当用户数量显著减少时才清理（从80%改为90%）
-      if (activeUsers.length < session.users.length * 0.9) {
-        const updatedSession = { ...session, users: activeUsers };
-        await this.redis.setex(
-          `${this.SESSION_PREFIX}${sessionId}`, 
-          this.SESSION_TTL, 
-          JSON.stringify(updatedSession)
-        );
-        console.log(`Cleaned up ${session.users.length - activeUsers.length} inactive users from session ${sessionId}`);
-        return updatedSession;
-      }
-
       return session;
     } catch (error) {
       console.error('Failed to get session:', error);
@@ -408,26 +389,89 @@ export class RedisSessionStore {
     });
   }
 
-  // 清理过期会话
+  // 新增：从会话中移除用户
+  async removeUserFromSession(sessionId: string, userId: string): Promise<SessionData | null> {
+    const lockKey = `${this.SESSION_LOCK_PREFIX}${sessionId}`;
+    
+    // 尝试获取锁
+    const lock = await this.redis.set(lockKey, '1', 'PX', 5000, 'NX');
+    
+    if (!lock) {
+      throw new Error('Session is locked, please retry');
+    }
+
+    try {
+      const session = await this.getSession(sessionId);
+      if (!session) throw new Error('Session not found');
+      
+      // 找到要移除的用户
+      const userToRemove = session.users.find(user => user.id === userId);
+      if (!userToRemove) {
+        return session; // 用户不存在，返回原会话
+      }
+
+      // 移除用户
+      const updatedUsers = session.users.filter(user => user.id !== userId);
+
+      // 如果移除的是主持人，需要转移主持人权限
+      if (userToRemove.role === "host") {
+        const firstAttendance = updatedUsers.find(user => user.role === "attendance");
+        if (firstAttendance) {
+          // 将第一个attendance用户设为主持人
+          const finalUsers = updatedUsers.map(user => 
+            user.id === firstAttendance.id ? { ...user, role: "host" as UserRole } : user
+          );
+          const updatedSession = {
+            ...session,
+            users: finalUsers,
+            hostId: firstAttendance.id,
+          };
+          await this.redis.setex(
+            `${this.SESSION_PREFIX}${sessionId}`, 
+            this.SESSION_TTL, 
+            JSON.stringify(updatedSession)
+          );
+          return updatedSession;
+        } else {
+          // 没有其他用户，删除会话
+          await this.redis.del(`${this.SESSION_PREFIX}${sessionId}`);
+          return null;
+        }
+      }
+
+      const updatedSession = {
+        ...session,
+        users: updatedUsers,
+      };
+      
+      await this.redis.setex(
+        `${this.SESSION_PREFIX}${sessionId}`, 
+        this.SESSION_TTL, 
+        JSON.stringify(updatedSession)
+      );
+      
+      return updatedSession;
+    } finally {
+      // 释放锁
+      await this.redis.del(lockKey);
+    }
+  }
+
+  // 清理过期会话 - 只清理完全没有用户的会话
   async cleanupExpiredSessions(): Promise<void> {
     try {
       const keys = await this.redis.keys(`${this.SESSION_PREFIX}*`);
-      const now = Date.now();
       
       for (const key of keys) {
         const sessionData = await this.redis.get(key);
         if (sessionData) {
           const session = JSON.parse(sessionData) as SessionData;
-          // 增加活跃用户检测时间到10分钟
-          const activeUsers = session.users.filter(
-            (user) => now - user.lastSeen < 600000 // 10分钟
-          );
           
-          if (activeUsers.length === 0) {
-            // 没有活跃用户，删除会话
+          // 只清理完全没有用户的会话
+          if (session.users.length === 0) {
             await this.redis.del(key);
             await this.redis.del(`${this.CONNECTION_PREFIX}${session.id}`);
-            console.log(`Cleaned up expired session: ${session.id}`);
+            console.log(`Cleaned up empty session: ${session.id}`);
           }
         }
       }

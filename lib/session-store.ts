@@ -30,19 +30,7 @@ export function getSession(sessionId: string): Session | null {
   const session = sessions.get(sessionId);
   if (!session) return null;
 
-  // 清理不活跃用户（120秒未活跃，增加容错性）
-  const now = Date.now();
-  const activeUsers = session.users.filter(
-    (user) => now - user.lastSeen < 120000 // 从60秒增加到120秒
-  );
-
-  // 只有当用户数量显著减少时才清理（80%阈值）
-  if (activeUsers.length < session.users.length * 0.8) {
-    const updatedSession = { ...session, users: activeUsers };
-    sessions.set(sessionId, updatedSession);
-    return updatedSession;
-  }
-
+  // 移除不活跃用户清理逻辑，用户只有在主动离开时才会被移除
   return session;
 }
 
@@ -296,6 +284,54 @@ export function transferHostRole(
     ...session,
     users: updatedUsers,
     hostId: firstAttendance.id,
+  };
+
+  sessions.set(sessionId, updatedSession);
+  return updatedSession;
+}
+
+// 新增：从会话中移除用户
+export function removeUserFromSession(
+  sessionId: string,
+  userId: string
+): Session | null {
+  const session = getSession(sessionId);
+  if (!session) return null;
+
+  // 找到要移除的用户
+  const userToRemove = session.users.find(user => user.id === userId);
+  if (!userToRemove) {
+    return session; // 用户不存在，返回原会话
+  }
+
+  // 移除用户
+  const updatedUsers = session.users.filter(user => user.id !== userId);
+
+  // 如果移除的是主持人，需要转移主持人权限
+  if (userToRemove.role === "host") {
+    const firstAttendance = updatedUsers.find(user => user.role === "attendance");
+    if (firstAttendance) {
+      // 将第一个attendance用户设为主持人
+      const finalUsers = updatedUsers.map(user => 
+        user.id === firstAttendance.id ? { ...user, role: "host" as UserRole } : user
+      );
+      const updatedSession = {
+        ...session,
+        users: finalUsers,
+        hostId: firstAttendance.id,
+      };
+      sessions.set(sessionId, updatedSession);
+      return updatedSession;
+    } else {
+      // 没有其他用户，删除会话
+      sessions.delete(sessionId);
+      return null;
+    }
+  }
+
+  const updatedSession = {
+    ...session,
+    users: updatedUsers,
   };
 
   sessions.set(sessionId, updatedSession);

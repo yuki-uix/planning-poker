@@ -143,3 +143,23 @@ export async function transferHost(
     return { success: false, error: "Failed to transfer host role" };
   }
 }
+
+// 新增：用户离开会话
+export async function leaveSession(
+  sessionId: string,
+  userId: string
+) {
+  try {
+    // 在开发环境中使用内存版本的session store
+    if (process.env.NODE_ENV === 'development') {
+      const { removeUserFromSession } = await import('@/lib/session-store');
+      const session = removeUserFromSession(sessionId, userId);
+      return { success: true, session };
+    } else {
+      const session = await redisSessionStore.removeUserFromSession(sessionId, userId);
+      return { success: true, session };
+    }
+  } catch {
+    return { success: false, error: "Failed to leave session" };
+  }
+}
