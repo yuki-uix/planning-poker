@@ -12,7 +12,8 @@ export async function createSessionWithAutoId(
     const sessionId = uuidv4();
     const session = await redisSessionStore.createSession(sessionId, userId, userName);
     return { success: true, session, sessionId };
-  } catch {
+  } catch (error) {
+    console.error('Failed to create session with auto ID:', error);
     return { success: false, error: "Failed to create session" };
   }
 }

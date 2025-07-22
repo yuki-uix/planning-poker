@@ -24,6 +24,7 @@ export function PointEstimationTool() {
     copied,
     isRestoring,
     showSessionErrorModal,
+    errorMessage,
     setUserName,
     setSelectedRole,
     setShowSessionErrorModal,
@@ -71,6 +72,7 @@ export function PointEstimationTool() {
           isOpen={showSessionErrorModal}
           onClose={() => setShowSessionErrorModal(false)}
           onBackToHost={handleBackToHost}
+          errorMessage={errorMessage || undefined}
         />
         {/* 调试面板 - 仅在开发环境显示 */}
         {process.env.NODE_ENV === 'development' && (
@@ -144,6 +146,7 @@ export function PointEstimationTool() {
         isOpen={showSessionErrorModal}
         onClose={() => setShowSessionErrorModal(false)}
         onBackToHost={handleBackToHost}
+        errorMessage={errorMessage || undefined}
       />
 
       {/* 调试面板 - 仅在开发环境显示 */}

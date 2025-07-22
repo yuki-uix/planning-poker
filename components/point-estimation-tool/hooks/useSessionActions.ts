@@ -44,11 +44,14 @@ export function useSessionActions(): SessionActions {
           },
         });
         return true;
+      } else {
+        console.error('Failed to create session:', result.error || 'Unknown error');
+        return false;
       }
-    } catch {
+    } catch (error) {
+      console.error('Exception during session creation:', error);
       return false;
     }
-    return false;
   }, []);
 
   const handleJoinSession = useCallback(async (

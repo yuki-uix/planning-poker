@@ -47,6 +47,8 @@ export class RedisSessionStore {
       // 添加健康检查
       keepAlive: 30000,
       family: 4,
+      // 添加TLS支持（Upstash Redis需要）
+      tls: process.env.REDIS_HOST && process.env.REDIS_HOST.includes('upstash.io') ? {} : undefined,
       // 添加重连配置
       reconnectOnError: (err) => {
         const targetError = 'READONLY';
@@ -120,37 +122,43 @@ export class RedisSessionStore {
     userId: string,
     userName: string
   ): Promise<SessionData> {
-    const now = Date.now();
+    try {
+      const now = Date.now();
 
-    const hostUser: User = {
-      id: userId,
-      name: userName,
-      role: "host",
-      vote: null,
-      hasVoted: false,
-      lastSeen: now,
-    };
+      const hostUser: User = {
+        id: userId,
+        name: userName,
+        role: "host",
+        vote: null,
+        hasVoted: false,
+        lastSeen: now,
+      };
 
-    const newSession: SessionData = {
-      id: sessionId,
-      users: [hostUser],
-      revealed: false,
-      votes: {},
-      createdAt: now,
-      hostId: userId,
-      template: {
-        type: "fibonacci",
-        customCards: "☕️,1,2,3,5,8,13",
-      },
-    };
+      const newSession: SessionData = {
+        id: sessionId,
+        users: [hostUser],
+        revealed: false,
+        votes: {},
+        createdAt: now,
+        hostId: userId,
+        template: {
+          type: "fibonacci",
+          customCards: "☕️,1,2,3,5,8,13",
+        },
+      };
 
-    await this.redis.setex(
-      `${this.SESSION_PREFIX}${sessionId}`, 
-      this.SESSION_TTL, 
-      JSON.stringify(newSession)
-    );
+      await this.redis.setex(
+        `${this.SESSION_PREFIX}${sessionId}`, 
+        this.SESSION_TTL, 
+        JSON.stringify(newSession)
+      );
 
-    return newSession;
+      console.log(`Session created successfully: ${sessionId}`);
+      return newSession;
+    } catch (error) {
+      console.error(`Failed to create session ${sessionId}:`, error);
+      throw error;
+    }
   }
 
   // 加入会话

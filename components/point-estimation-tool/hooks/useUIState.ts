@@ -3,10 +3,12 @@ import { useState } from "react";
 export interface UIState {
   copied: boolean;
   showSessionErrorModal: boolean;
+  errorMessage: string | null;
 }
 
 export interface UIStateHandlers {
   setShowSessionErrorModal: (show: boolean) => void;
+  setErrorMessage: (message: string | null) => void;
   copyShareLink: (sessionId: string) => Promise<void>;
   updateURL: (sessionId: string, isJoined: boolean) => void;
   clearURL: () => void;
@@ -15,6 +17,7 @@ export interface UIStateHandlers {
 export function useUIState(): UIState & UIStateHandlers {
   const [copied, setCopied] = useState(false);
   const [showSessionErrorModal, setShowSessionErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const copyShareLink = async (sessionId: string) => {
     const shareUrl = new URL(window.location.href);
@@ -44,6 +47,8 @@ export function useUIState(): UIState & UIStateHandlers {
     copied,
     showSessionErrorModal,
     setShowSessionErrorModal,
+    errorMessage,
+    setErrorMessage,
     copyShareLink,
     updateURL,
     clearURL,

@@ -10,7 +10,7 @@ import type { SessionErrorModalProps } from "./types";
 import { useSessionErrorModal } from "./useSessionErrorModal";
 
 export function SessionErrorModal(props: SessionErrorModalProps) {
-  const { t, isOpen, onClose, onBackToHost } = useSessionErrorModal(props);
+  const { t, isOpen, onClose, onBackToHost, errorMessage } = useSessionErrorModal(props);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -20,7 +20,7 @@ export function SessionErrorModal(props: SessionErrorModalProps) {
             {t.errors.sessionNotFound.title}
           </DialogTitle>
           <DialogDescription className="text-gray-600">
-            {t.errors.sessionNotFound.description}
+            {errorMessage || t.errors.sessionNotFound.description}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-row space-x-3">

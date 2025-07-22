@@ -48,6 +48,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
   const handleCreateSession = useCallback(async () => {
     if (!userState.userName.trim()) return;
     sessionState.setIsLoading(true);
+    uiState.setErrorMessage(null); // 清除之前的错误信息
     const userId = `${userState.userName}-${Date.now()}`;
     try {
       const result = await sessionActions.handleCreateSession(
@@ -67,9 +68,16 @@ export function usePointEstimationTool(): PointEstimationToolState &
         sessionState.setIsConnected(true);
       } else {
         sessionState.setIsConnected(false);
+        console.error('Failed to create session: result is false');
+        uiState.setErrorMessage('创建会话失败，请检查网络连接或稍后重试');
+        uiState.setShowSessionErrorModal(true);
       }
-    } catch {
+    } catch (error) {
       sessionState.setIsConnected(false);
+      console.error('Failed to create session:', error);
+      const errorMsg = error instanceof Error ? error.message : '创建会话时发生未知错误';
+      uiState.setErrorMessage(`创建会话失败: ${errorMsg}`);
+      uiState.setShowSessionErrorModal(true);
     } finally {
       sessionState.setIsLoading(false);
     }
@@ -80,6 +88,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
     userState.setIsJoined,
     sessionState,
     sessionActions,
+    uiState,
   ]);
 
   // 处理加入会话
@@ -195,7 +204,8 @@ export function usePointEstimationTool(): PointEstimationToolState &
     uiState.clearURL();
   }, [userState.clearUserState, sessionState, uiState]);
 
-  const resultObj = {
+  return {
+    // 状态
     currentUser: userState.currentUser,
     userName: userState.userName,
     sessionId: userState.sessionId,
@@ -208,9 +218,11 @@ export function usePointEstimationTool(): PointEstimationToolState &
     copied: uiState.copied,
     isRestoring: userState.isRestoring,
     showSessionErrorModal: uiState.showSessionErrorModal,
+    errorMessage: uiState.errorMessage,
+
+    // 处理函数
     setUserName: userState.setUserName,
     setSelectedRole: userState.setSelectedRole,
-    setShowSessionErrorModal: uiState.setShowSessionErrorModal,
     handleCreateSession,
     handleJoinSession,
     handleCastVote,
@@ -221,12 +233,13 @@ export function usePointEstimationTool(): PointEstimationToolState &
     handleLogout,
     handleBackToHost,
     copyShareLink: () => uiState.copyShareLink(userState.sessionId),
+    setShowSessionErrorModal: uiState.setShowSessionErrorModal,
+
+    // 计算值
     stats: computedValues.stats,
     allUsersVoted: computedValues.allUsersVoted,
     isHost: computedValues.isHost,
     canVote: computedValues.canVote,
     currentUserData: computedValues.currentUserData,
   };
-
-  return resultObj;
 }
