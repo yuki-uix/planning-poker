@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Session } from "@/types/estimation";
 import { useSSEConnectionManager } from "@/hooks/use-sse-connection-manager";
-import { leaveSession } from "@/app/actions";
+import { leaveSession, userHeartbeat } from "@/app/actions";
 
 export interface SessionState {
   session: Session | null;
@@ -51,6 +51,14 @@ export function useSessionState(
     userId: currentUser,
     onSessionUpdate: (session: Session) => {
       setSession(session);
+    },
+    onDisconnect: () => {
+      // SSE连接断开时，不立即离开会话，而是继续使用HTTP轮询
+      console.log('SSE disconnected, falling back to HTTP polling');
+    },
+    onError: (error) => {
+      // SSE连接错误时，不立即离开会话
+      console.error('SSE connection error:', error);
     }
   });
 
@@ -59,6 +67,13 @@ export function useSessionState(
     if (sessionId && currentUser && isJoined && !hasLeftSessionRef.current) {
       hasLeftSessionRef.current = true;
       try {
+        console.log('User leaving session due to page close/visibility change', {
+          sessionId,
+          userId: currentUser,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+          platform: navigator.platform
+        });
         await leaveSession(sessionId, currentUser);
       } catch (error) {
         console.error('Failed to leave session:', error);
@@ -66,62 +81,146 @@ export function useSessionState(
     }
   }, [sessionId, currentUser, isJoined]);
 
-  // 标签页关闭检测
+  // 标签页关闭检测 - 优化版本，更适合生产环境
   useEffect(() => {
     if (!isJoined || !sessionId || !currentUser) return;
 
     let leaveTimeout: NodeJS.Timeout | null = null;
+    let heartbeatInterval: NodeJS.Timeout | null = null;
+    let lastActivityTime = Date.now();
+    let isPageVisible = true;
+
+    // 更新最后活跃时间
+    const updateActivity = () => {
+      lastActivityTime = Date.now();
+    };
+
+    // 处理用户离开会话
+    const handleUserLeave = async () => {
+      if (sessionId && currentUser && isJoined && !hasLeftSessionRef.current) {
+        hasLeftSessionRef.current = true;
+        try {
+          console.log('User leaving session due to page close/visibility change');
+          await leaveSession(sessionId, currentUser);
+        } catch (error) {
+          console.error('Failed to leave session:', error);
+        }
+      }
+    };
+
+    // 心跳检测 - 确保用户仍然活跃
+    const startHeartbeat = () => {
+      heartbeatInterval = setInterval(async () => {
+        const now = Date.now();
+        const timeSinceLastActivity = now - lastActivityTime;
+        
+        // 如果页面可见且超过30秒没有活动，发送心跳
+        if (isPageVisible && timeSinceLastActivity > 30000) {
+          updateActivity();
+          // 发送心跳请求到服务器
+          try {
+            console.log('Sending heartbeat to keep session alive');
+            await userHeartbeat(sessionId, currentUser);
+          } catch (error) {
+            console.error('Failed to send heartbeat:', error);
+          }
+        }
+      }, 30000); // 每30秒检查一次
+    };
 
     const handleBeforeUnload = (
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       _event: BeforeUnloadEvent
     ) => {
       // 在页面卸载前尝试离开会话
+      console.log('Page unloading, leaving session');
       handleUserLeave();
     };
 
     const handlePageHide = (event: PageTransitionEvent) => {
       // 当页面隐藏时（包括关闭标签页、刷新等）
+      console.log('Page hiding, persisted:', event.persisted);
       if (event.persisted === false) {
+        // 页面不会保持状态，用户可能真的离开了
         handleUserLeave();
       }
     };
 
     const handleVisibilityChange = () => {
-      // 当页面变为不可见时
-      if (document.visibilityState === 'hidden') {
+      const wasVisible = isPageVisible;
+      isPageVisible = document.visibilityState === 'visible';
+      
+      console.log('Visibility changed:', document.visibilityState);
+      
+      if (wasVisible && !isPageVisible) {
+        // 页面变为不可见
         // 清除之前的定时器
         if (leaveTimeout) {
           clearTimeout(leaveTimeout);
         }
         
         // 延迟执行，给用户一些时间重新打开标签页
+        // 在生产环境中使用更长的延迟
+        const delay = process.env.NODE_ENV === 'production' ? 30000 : 10000; // 生产环境30秒，开发环境10秒
         leaveTimeout = setTimeout(() => {
           if (document.visibilityState === 'hidden') {
+            console.log('Page still hidden after delay, leaving session');
             handleUserLeave();
           }
-        }, 10000); // 10秒延迟，给用户更多时间
-      } else {
-        // 页面重新可见，清除定时器
+        }, delay);
+      } else if (!wasVisible && isPageVisible) {
+        // 页面重新可见，清除定时器并更新活跃时间
         if (leaveTimeout) {
           clearTimeout(leaveTimeout);
           leaveTimeout = null;
         }
+        updateActivity();
+        console.log('Page became visible again, staying in session');
       }
     };
 
+    // 监听用户活动
+    const handleUserActivity = () => {
+      updateActivity();
+    };
+
+    // 添加事件监听器
     window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('pagehide', handlePageHide);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // 监听用户活动事件
+    window.addEventListener('mousedown', handleUserActivity);
+    window.addEventListener('mousemove', handleUserActivity);
+    window.addEventListener('keydown', handleUserActivity);
+    window.addEventListener('touchstart', handleUserActivity);
+    window.addEventListener('scroll', handleUserActivity);
+    window.addEventListener('click', handleUserActivity);
+
+    // 启动心跳检测
+    startHeartbeat();
+
+    // 初始化活跃时间
+    updateActivity();
 
     return () => {
+      // 清理事件监听器
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('pagehide', handlePageHide);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('mousedown', handleUserActivity);
+      window.removeEventListener('mousemove', handleUserActivity);
+      window.removeEventListener('keydown', handleUserActivity);
+      window.removeEventListener('touchstart', handleUserActivity);
+      window.removeEventListener('scroll', handleUserActivity);
+      window.removeEventListener('click', handleUserActivity);
       
       // 清理定时器
       if (leaveTimeout) {
         clearTimeout(leaveTimeout);
+      }
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
       }
     };
   }, [isJoined, sessionId, currentUser, handleUserLeave]);

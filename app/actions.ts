@@ -163,3 +163,16 @@ export async function leaveSession(
     return { success: false, error: "Failed to leave session" };
   }
 }
+
+// 新增：用户心跳 - 保持会话活跃
+export async function userHeartbeat(
+  sessionId: string,
+  userId: string
+) {
+  try {
+    const session = await redisSessionStore.updateUserHeartbeat(sessionId, userId);
+    return { success: true, session };
+  } catch {
+    return { success: false, error: "Failed to update heartbeat" };
+  }
+}
