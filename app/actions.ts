@@ -1,7 +1,17 @@
 "use server";
 
-import { UserRole } from "@/lib/session-store";
-import { redisSessionStore } from "@/lib/redis-session-store";
+import {
+  createSession,
+  joinSession,
+  getSession,
+  updateUserVote,
+  revealSessionVotes,
+  resetSessionVotes,
+  updateUserHeartbeat,
+  updateSessionTemplate,
+  transferHostRole,
+  UserRole,
+} from "@/lib/session-store";
 import { v4 as uuidv4 } from "uuid";
 
 export async function createSessionWithAutoId(
@@ -10,10 +20,9 @@ export async function createSessionWithAutoId(
 ) {
   try {
     const sessionId = uuidv4();
-    const session = await redisSessionStore.createSession(sessionId, userId, userName);
+    const session = createSession(sessionId, userId, userName);
     return { success: true, session, sessionId };
-  } catch (error) {
-    console.error('Failed to create session with auto ID:', error);
+  } catch {
     return { success: false, error: "Failed to create session" };
   }
 }
@@ -24,7 +33,7 @@ export async function createNewSession(
   userName: string
 ) {
   try {
-    const session = await redisSessionStore.createSession(sessionId, userId, userName);
+    const session = createSession(sessionId, userId, userName);
     return { success: true, session };
   } catch {
     return { success: false, error: "Failed to create session" };
@@ -38,7 +47,7 @@ export async function joinSessionAsRole(
   role: UserRole
 ) {
   try {
-    const session = await redisSessionStore.joinSession(sessionId, userId, userName, role);
+    const session = joinSession(sessionId, userId, userName, role);
     return { success: true, session };
   } catch {
     return { success: false, error: "Failed to join session" };
@@ -52,7 +61,7 @@ export async function joinSessionLegacy(
   userName: string
 ) {
   try {
-    const session = await redisSessionStore.joinSession(
+    const session = joinSessionAsRole(
       sessionId,
       userId,
       userName,
@@ -66,7 +75,7 @@ export async function joinSessionLegacy(
 
 export async function getSessionData(sessionId: string) {
   try {
-    const session = await redisSessionStore.getSession(sessionId);
+    const session = getSession(sessionId);
     return { success: true, session };
   } catch {
     return { success: false, error: "Failed to get session data" };
@@ -79,7 +88,7 @@ export async function castVote(
   vote: string
 ) {
   try {
-    const session = await redisSessionStore.updateUserVote(sessionId, userId, vote);
+    const session = updateUserVote(sessionId, userId, vote);
     return { success: true, session };
   } catch {
     return { success: false, error: "Failed to cast vote" };
@@ -88,7 +97,7 @@ export async function castVote(
 
 export async function revealVotes(sessionId: string, userId: string) {
   try {
-    const session = await redisSessionStore.revealSessionVotes(sessionId, userId);
+    const session = revealSessionVotes(sessionId, userId);
     return { success: true, session };
   } catch {
     return { success: false, error: "Failed to reveal votes" };
@@ -97,7 +106,7 @@ export async function revealVotes(sessionId: string, userId: string) {
 
 export async function resetVotes(sessionId: string, userId: string) {
   try {
-    const session = await redisSessionStore.resetSessionVotes(sessionId, userId);
+    const session = resetSessionVotes(sessionId, userId);
     return { success: true, session };
   } catch {
     return { success: false, error: "Failed to reset votes" };
@@ -106,7 +115,7 @@ export async function resetVotes(sessionId: string, userId: string) {
 
 export async function heartbeat(sessionId: string, userId: string) {
   try {
-    const session = await redisSessionStore.updateUserHeartbeat(sessionId, userId);
+    const session = updateUserHeartbeat(sessionId, userId);
     return { success: true, session };
   } catch {
     return { success: false, error: "Failed to update heartbeat" };
@@ -120,7 +129,7 @@ export async function updateTemplate(
   customCards?: string
 ) {
   try {
-    const session = await redisSessionStore.updateSessionTemplate(
+    const session = updateSessionTemplate(
       sessionId,
       userId,
       templateType,
@@ -137,42 +146,9 @@ export async function transferHost(
   currentHostId: string
 ) {
   try {
-    const session = await redisSessionStore.transferHostRole(sessionId, currentHostId);
+    const session = transferHostRole(sessionId, currentHostId);
     return { success: true, session };
   } catch {
     return { success: false, error: "Failed to transfer host role" };
-  }
-}
-
-// 新增：用户离开会话
-export async function leaveSession(
-  sessionId: string,
-  userId: string
-) {
-  try {
-    // 在开发环境中使用内存版本的session store
-    if (process.env.NODE_ENV === 'development') {
-      const { removeUserFromSession } = await import('@/lib/session-store');
-      const session = removeUserFromSession(sessionId, userId);
-      return { success: true, session };
-    } else {
-      const session = await redisSessionStore.removeUserFromSession(sessionId, userId);
-      return { success: true, session };
-    }
-  } catch {
-    return { success: false, error: "Failed to leave session" };
-  }
-}
-
-// 新增：用户心跳 - 保持会话活跃
-export async function userHeartbeat(
-  sessionId: string,
-  userId: string
-) {
-  try {
-    const session = await redisSessionStore.updateUserHeartbeat(sessionId, userId);
-    return { success: true, session };
-  } catch {
-    return { success: false, error: "Failed to update heartbeat" };
   }
 }

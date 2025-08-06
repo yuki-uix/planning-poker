@@ -7,7 +7,6 @@ export interface User {
   vote: string | null;
   hasVoted: boolean;
   lastSeen: number;
-  lastActive?: number;
 }
 
 export interface Session {
@@ -17,7 +16,6 @@ export interface Session {
   votes: Record<string, string>;
   createdAt: number;
   hostId: string;
-  lastUpdated?: number;
   template: {
     type: string;
     customCards?: string;

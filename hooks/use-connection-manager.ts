@@ -1,103 +1,196 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { ConnectionManager, ConnectionConfig, ConnectionState } from '@/lib/connection-manager';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { ConnectionManager, ConnectionState } from '@/lib/connection-manager';
+import { WebSocketMessage } from '@/lib/websocket-client';
+import { Session } from '@/types/estimation';
 
-export interface UseConnectionManagerConfig {
+interface UseConnectionManagerOptions {
   sessionId: string;
   userId: string;
-  pollingInterval?: number;
-  heartbeatInterval?: number;
-  maxRetries?: number;
-  retryDelay?: number;
+  onSessionUpdate?: (session: Session) => void;
+  onConnect?: () => void;
+  onDisconnect?: () => void;
+  onError?: (error: any) => void;
+  onConnectionTypeChange?: (type: 'websocket' | 'http') => void;
 }
 
-export interface UseConnectionManagerReturn {
-  state: ConnectionState;
-  connect: () => Promise<void>;
-  disconnect: () => void;
-  reconnect: () => Promise<void>;
-  sendMessage: (message: any) => Promise<void>;
-}
-
-export function useConnectionManager(config: UseConnectionManagerConfig): UseConnectionManagerReturn {
-  const [state, setState] = useState<ConnectionState>({
+export function useConnectionManager({
+  sessionId,
+  userId,
+  onSessionUpdate,
+  onConnect,
+  onDisconnect,
+  onError,
+  onConnectionTypeChange
+}: UseConnectionManagerOptions) {
+  const [connectionState, setConnectionState] = useState<ConnectionState>({
     isConnected: false,
+    isConnecting: false,
+    connectionType: 'disconnected',
     lastHeartbeat: 0,
-    retryCount: 0,
-    lastError: null,
-    connectionType: 'polling'
+    reconnectAttempts: 0
   });
 
   const connectionManagerRef = useRef<ConnectionManager | null>(null);
 
-  // 创建连接管理器
-  useEffect(() => {
-    const connectionConfig: ConnectionConfig = {
-      sessionId: config.sessionId,
-      userId: config.userId,
-      pollingInterval: config.pollingInterval,
-      heartbeatInterval: config.heartbeatInterval,
-      maxRetries: config.maxRetries,
-      retryDelay: config.retryDelay
-    };
+  // 初始化连接管理器
+  const initConnectionManager = useCallback(() => {
+    if (connectionManagerRef.current) {
+      connectionManagerRef.current.disconnect();
+    }
 
-    connectionManagerRef.current = new ConnectionManager(connectionConfig);
+    const websocketUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/websocket?sessionId=${sessionId}&userId=${userId}`;
+    
+    connectionManagerRef.current = new ConnectionManager({
+      sessionId,
+      userId,
+      websocketUrl,
+      httpPollInterval: 2000,
+      heartbeatInterval: 30000,
+      maxReconnectAttempts: 10,
+      fallbackDelay: 5000
+    });
 
-    // 清理函数
-    return () => {
+    // 设置事件回调
+    connectionManagerRef.current.onSessionUpdate((session: Session) => {
+      onSessionUpdate?.(session);
+    });
+
+    connectionManagerRef.current.onConnect(() => {
+      console.log('Connection established');
+      setConnectionState(prev => ({ ...prev, isConnected: true, isConnecting: false }));
+      onConnect?.();
+    });
+
+    connectionManagerRef.current.onDisconnect(() => {
+      console.log('Connection lost');
+      setConnectionState(prev => ({ ...prev, isConnected: false }));
+      onDisconnect?.();
+    });
+
+    connectionManagerRef.current.onError((error: any) => {
+      console.error('Connection error:', error);
+      onError?.(error);
+    });
+
+    connectionManagerRef.current.onConnectionTypeChange((type: 'websocket' | 'http') => {
+      console.log('Connection type changed to:', type);
+      setConnectionState(prev => ({ ...prev, connectionType: type }));
+      onConnectionTypeChange?.(type);
+    });
+
+    // 定期更新连接状态
+    const stateUpdateInterval = setInterval(() => {
       if (connectionManagerRef.current) {
-        connectionManagerRef.current.disconnect();
-        connectionManagerRef.current = null;
+        setConnectionState(connectionManagerRef.current.getState());
       }
-    };
-  }, [config.sessionId, config.userId, config.pollingInterval, config.heartbeatInterval, config.maxRetries, config.retryDelay]);
+    }, 1000);
 
-  // 状态更新
-  useEffect(() => {
-    if (!connectionManagerRef.current) return;
+    return () => clearInterval(stateUpdateInterval);
+  }, [sessionId, userId, onSessionUpdate, onConnect, onDisconnect, onError, onConnectionTypeChange]);
 
-    const updateState = () => {
-      const currentState = connectionManagerRef.current?.getState();
-      if (currentState) {
-        setState(currentState);
-      }
-    };
-
-    // 定期更新状态
-    const interval = setInterval(updateState, 1000);
-    updateState(); // 立即更新一次
-
-    return () => clearInterval(interval);
-  }, []);
-
+  // 连接
   const connect = useCallback(async () => {
     if (connectionManagerRef.current) {
-      await connectionManagerRef.current.connect();
+      try {
+        await connectionManagerRef.current.connect();
+      } catch (error) {
+        console.error('Failed to connect:', error);
+        throw error;
+      }
     }
   }, []);
 
+  // 断开连接
   const disconnect = useCallback(() => {
     if (connectionManagerRef.current) {
       connectionManagerRef.current.disconnect();
     }
   }, []);
 
-  const reconnect = useCallback(async () => {
+  // 发送消息
+  const sendMessage = useCallback((message: Omit<WebSocketMessage, 'timestamp'>) => {
     if (connectionManagerRef.current) {
-      await connectionManagerRef.current.reconnect();
+      connectionManagerRef.current.send(message);
+    } else {
+      console.warn('Connection manager not initialized');
     }
   }, []);
 
-  const sendMessage = useCallback(async (message: any) => {
-    if (connectionManagerRef.current) {
-      await connectionManagerRef.current.sendMessage(message);
+  // 发送投票
+  const sendVote = useCallback((vote: string) => {
+    sendMessage({
+      type: 'vote',
+      sessionId,
+      userId,
+      data: { vote }
+    });
+  }, [sendMessage, sessionId, userId]);
+
+  // 发送显示投票请求
+  const sendReveal = useCallback(() => {
+    sendMessage({
+      type: 'reveal',
+      sessionId,
+      userId
+    });
+  }, [sendMessage, sessionId, userId]);
+
+  // 发送重置投票请求
+  const sendReset = useCallback(() => {
+    sendMessage({
+      type: 'reset',
+      sessionId,
+      userId
+    });
+  }, [sendMessage, sessionId, userId]);
+
+  // 发送模板更新
+  const sendTemplateUpdate = useCallback((templateData: { type: string; customCards?: string }) => {
+    sendMessage({
+      type: 'template_update',
+      sessionId,
+      userId,
+      data: templateData
+    });
+  }, [sendMessage, sessionId, userId]);
+
+  // 组件挂载时初始化连接管理器
+  useEffect(() => {
+    if (sessionId && userId) {
+      const cleanup = initConnectionManager();
+      return cleanup;
     }
-  }, []);
+  }, [sessionId, userId, initConnectionManager]);
+
+  // 组件挂载时连接
+  useEffect(() => {
+    if (sessionId && userId && connectionManagerRef.current) {
+      connect();
+    }
+
+    // 组件卸载时断开连接
+    return () => {
+      disconnect();
+    };
+  }, [sessionId, userId, connect, disconnect]);
 
   return {
-    state,
+    // 连接状态
+    isConnected: connectionState.isConnected,
+    isConnecting: connectionState.isConnecting,
+    connectionType: connectionState.connectionType,
+    lastHeartbeat: connectionState.lastHeartbeat,
+    reconnectAttempts: connectionState.reconnectAttempts,
+
+    // 连接管理
     connect,
     disconnect,
-    reconnect,
-    sendMessage
+
+    // 消息发送
+    sendMessage,
+    sendVote,
+    sendReveal,
+    sendReset,
+    sendTemplateUpdate
   };
 } 

@@ -2,10 +2,11 @@
 
 import { Button } from "@/components/ui/button";
 import { useLanguageSwitcher } from "./useLanguageSwitcher";
+import type { LanguageSwitcherProps } from "./types";
 import { Languages } from "lucide-react";
 
-export function LanguageSwitcher() {
-  const { language, toggleLanguage } = useLanguageSwitcher();
+export function LanguageSwitcher(props: LanguageSwitcherProps = {}) {
+  const { language, toggleLanguage } = useLanguageSwitcher(props);
 
   return (
     <Button

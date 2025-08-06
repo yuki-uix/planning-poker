@@ -8,7 +8,7 @@ import {
   revealVotes,
   resetVotes,
   updateTemplate,
-  leaveSession,
+  transferHost,
 } from "@/app/actions";
 import { saveUserData, updateUserVote } from "@/lib/persistence";
 
@@ -44,14 +44,11 @@ export function useSessionActions(): SessionActions {
           },
         });
         return true;
-      } else {
-        console.error('Failed to create session:', result.error || 'Unknown error');
-        return false;
       }
-    } catch (error) {
-      console.error('Exception during session creation:', error);
+    } catch {
       return false;
     }
+    return false;
   }, []);
 
   const handleJoinSession = useCallback(async (
@@ -186,13 +183,11 @@ export function useSessionActions(): SessionActions {
   const handleLogout = useCallback(async (
     sessionId: string,
     currentUser: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _isHost: boolean
+    isHost: boolean
   ): Promise<void> => {
-    if (sessionId && currentUser) {
+    if (isHost && sessionId && currentUser) {
       try {
-        // 直接从会话中移除用户
-        await leaveSession(sessionId, currentUser);
+        await transferHost(sessionId, currentUser);
       } catch {}
     }
   }, []);

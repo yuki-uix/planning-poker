@@ -38,9 +38,9 @@ export class WebSocketClient {
 
   constructor(config: WebSocketConfig) {
     this.config = {
-      reconnectInterval: 3000,
-      heartbeatInterval: 30000, // 30秒心跳
-      maxReconnectAttempts: 10,
+      reconnectInterval: 5000, // 增加重连间隔，减少服务器压力
+      heartbeatInterval: 45000, // 45秒心跳，与服务器同步
+      maxReconnectAttempts: 15, // 增加重连次数
       ...config
     };
   }
@@ -165,28 +165,18 @@ export class WebSocketClient {
     this.clearReconnectTimer();
     this.reconnectAttempts++;
     
-    // 指数退避，最大30秒
     const delay = Math.min(
-      this.config.reconnectInterval! * Math.pow(1.5, this.reconnectAttempts - 1),
-      30000
+      this.config.reconnectInterval! * Math.pow(1.5, this.reconnectAttempts - 1), // 更温和的指数增长
+      45000 // 最大45秒，适配云环境
     );
 
-    // 添加随机抖动，避免同时重连
-    const jitter = Math.random() * 1000;
-    const finalDelay = delay + jitter;
-
-    console.log(`Scheduling reconnect attempt ${this.reconnectAttempts} in ${finalDelay}ms`);
+    console.log(`Scheduling reconnect attempt ${this.reconnectAttempts} in ${delay}ms`);
     
     this.reconnectTimer = setTimeout(() => {
       this.connect().catch(error => {
         console.error('Reconnect failed:', error);
-        // 记录连接稳定性
-        if (typeof window !== 'undefined') {
-          // 在浏览器环境中记录
-          console.warn(`Connection lost: reconnect_failed (websocket) after ${finalDelay}ms`);
-        }
       });
-    }, finalDelay);
+    }, delay);
   }
 
   // 清除重连定时器

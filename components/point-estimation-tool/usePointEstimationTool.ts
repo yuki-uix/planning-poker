@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import { useCallback, useEffect } from "react";
 import { Session, TemplateType } from "@/types/estimation";
 import {
@@ -48,7 +47,6 @@ export function usePointEstimationTool(): PointEstimationToolState &
   const handleCreateSession = useCallback(async () => {
     if (!userState.userName.trim()) return;
     sessionState.setIsLoading(true);
-    uiState.setErrorMessage(null); // 清除之前的错误信息
     const userId = `${userState.userName}-${Date.now()}`;
     try {
       const result = await sessionActions.handleCreateSession(
@@ -68,27 +66,18 @@ export function usePointEstimationTool(): PointEstimationToolState &
         sessionState.setIsConnected(true);
       } else {
         sessionState.setIsConnected(false);
-        console.error('Failed to create session: result is false');
-        uiState.setErrorMessage('创建会话失败，请检查网络连接或稍后重试');
-        uiState.setShowSessionErrorModal(true);
       }
-    } catch (error) {
+    } catch {
       sessionState.setIsConnected(false);
-      console.error('Failed to create session:', error);
-      const errorMsg = error instanceof Error ? error.message : '创建会话时发生未知错误';
-      uiState.setErrorMessage(`创建会话失败: ${errorMsg}`);
-      uiState.setShowSessionErrorModal(true);
     } finally {
       sessionState.setIsLoading(false);
     }
   }, [
     userState.userName,
-    userState.setCurrentUser,
-    userState.setSessionId,
     userState.setIsJoined,
     sessionState,
     sessionActions,
-    uiState,
+    userState,
   ]);
 
   // 处理加入会话
@@ -122,13 +111,11 @@ export function usePointEstimationTool(): PointEstimationToolState &
     userState.userName,
     userState.sessionId,
     userState.selectedRole,
-    userState.currentUser,
-    userState.setCurrentUser,
-    userState.setSessionId,
     userState.setIsJoined,
     sessionState,
     sessionActions,
     uiState,
+    userState,
   ]);
 
   // 处理投票
@@ -141,42 +128,73 @@ export function usePointEstimationTool(): PointEstimationToolState &
       )
         return;
       userState.setSelectedVote(vote);
-      await sessionState.sendVote(vote);
+      await sessionActions.handleCastVote(
+        userState.sessionId,
+        userState.currentUser,
+        vote,
+        sessionState.session,
+        computedValues.canVote
+      );
     },
-    [sessionState, userState.currentUser, userState.setSelectedVote, computedValues.canVote]
+    [sessionState.session, userState, sessionActions, computedValues.canVote]
   );
 
   // 处理显示投票
   const handleRevealVotes = useCallback(async () => {
     if (!sessionState.session || !computedValues.isHost) return;
-    await sessionState.sendReveal();
-  }, [sessionState, computedValues.isHost]);
+    await sessionActions.handleRevealVotes(
+      userState.sessionId,
+      userState.currentUser,
+      sessionState.session,
+      computedValues.isHost
+    );
+  }, [sessionState.session, userState, sessionActions, computedValues.isHost]);
 
   // 处理重置投票
   const handleResetVotes = useCallback(async () => {
     if (!sessionState.session || !computedValues.isHost) return;
-    await sessionState.sendReset();
-  }, [sessionState, computedValues.isHost]);
+    await sessionActions.handleResetVotes(
+      userState.sessionId,
+      userState.currentUser,
+      sessionState.session,
+      computedValues.isHost,
+      userState.setSelectedVote,
+      sessionState.pollSession
+    );
+  }, [sessionState.session, userState, sessionActions, computedValues.isHost]);
 
   // 处理模板变更
   const handleTemplateChange = useCallback(
     async (templateType: TemplateType) => {
       if (!sessionState.session || !computedValues.isHost) return;
-      await sessionState.sendTemplateUpdate({ type: templateType });
+      await sessionActions.handleTemplateChange(
+        userState.sessionId,
+        userState.currentUser,
+        sessionState.session,
+        computedValues.isHost,
+        templateType,
+        userState.setSelectedVote,
+        sessionState.pollSession
+      );
     },
-    [sessionState, computedValues.isHost]
+    [sessionState.session, userState, sessionActions, computedValues.isHost]
   );
 
   // 处理自定义卡片变更
   const handleCustomCardsChange = useCallback(
     async (newCustomCards: string) => {
       if (!sessionState.session || !computedValues.isHost) return;
-      await sessionState.sendTemplateUpdate({ 
-        type: 'custom', 
-        customCards: newCustomCards 
-      });
+      await sessionActions.handleCustomCardsChange(
+        userState.sessionId,
+        userState.currentUser,
+        sessionState.session,
+        computedValues.isHost,
+        newCustomCards,
+        userState.setSelectedVote,
+        sessionState.pollSession
+      );
     },
-    [sessionState, computedValues.isHost]
+    [sessionState.session, userState, sessionActions, computedValues.isHost]
   );
 
   // 处理登出
@@ -192,7 +210,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
     sessionState.setIsConnected(true);
     sessionState.setIsLoading(false);
     uiState.clearURL();
-  }, [userState.sessionId, userState.currentUser, userState.clearUserState, sessionState, sessionActions, uiState, computedValues.isHost]);
+  }, [userState, sessionState, sessionActions, uiState, computedValues.isHost]);
 
   // 处理返回主机
   const handleBackToHost = useCallback(() => {
@@ -202,27 +220,24 @@ export function usePointEstimationTool(): PointEstimationToolState &
     sessionState.setIsJoined(false);
     sessionState.setIsConnected(true);
     uiState.clearURL();
-  }, [userState.clearUserState, sessionState, uiState]);
+  }, [userState, sessionState, uiState]);
 
-  return {
-    // 状态
+  const resultObj = {
     currentUser: userState.currentUser,
     userName: userState.userName,
     sessionId: userState.sessionId,
     selectedRole: userState.selectedRole,
     session: sessionState.session,
     selectedVote: userState.selectedVote,
-    isJoined: userState.isJoined,
+    isJoined: sessionState.isJoined,
     isConnected: sessionState.isConnected,
     isLoading: sessionState.isLoading,
     copied: uiState.copied,
     isRestoring: userState.isRestoring,
     showSessionErrorModal: uiState.showSessionErrorModal,
-    errorMessage: uiState.errorMessage,
-
-    // 处理函数
     setUserName: userState.setUserName,
     setSelectedRole: userState.setSelectedRole,
+    setShowSessionErrorModal: uiState.setShowSessionErrorModal,
     handleCreateSession,
     handleJoinSession,
     handleCastVote,
@@ -232,14 +247,19 @@ export function usePointEstimationTool(): PointEstimationToolState &
     handleCustomCardsChange,
     handleLogout,
     handleBackToHost,
-    copyShareLink: () => uiState.copyShareLink(userState.sessionId),
-    setShowSessionErrorModal: uiState.setShowSessionErrorModal,
-
-    // 计算值
+    copyShareLink: uiState.copyShareLink,
     stats: computedValues.stats,
     allUsersVoted: computedValues.allUsersVoted,
     isHost: computedValues.isHost,
     canVote: computedValues.canVote,
     currentUserData: computedValues.currentUserData,
   };
+  console.log("usePointEstimationTool", {
+    session: sessionState.session,
+    isJoined: sessionState.isJoined,
+    isRestoring: userState.isRestoring,
+    currentUser: userState.currentUser,
+    sessionId: userState.sessionId,
+  });
+  return resultObj;
 }
