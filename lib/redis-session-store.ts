@@ -37,62 +37,50 @@ export class RedisSessionStore {
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT || '6379'),
       password: process.env.REDIS_PASSWORD,
-      maxRetriesPerRequest: 3, // 减少重试次数，避免堆积
-      lazyConnect: true,
-      enableOfflineQueue: true, // 启用离线队列
+      maxRetriesPerRequest: 3,
+      lazyConnect: false, // 改为false，立即连接
+      enableOfflineQueue: true, // 改为true，允许离线队列
       enableReadyCheck: true,
-      // 优化超时配置
-      connectTimeout: 15000, // 增加连接超时
-      commandTimeout: 10000, // 增加命令超时
-      // 添加健康检查
-      keepAlive: 30000,
-      family: 4,
-      // 添加TLS支持（Upstash Redis需要）
-      tls: process.env.REDIS_HOST && process.env.REDIS_HOST.includes('upstash.io') ? {} : undefined,
-      // 添加重连配置
-      reconnectOnError: (err) => {
-        const targetError = 'READONLY';
-        if (err.message.includes(targetError)) {
-          return true;
-        }
-        return false;
-      },
+      retryDelayOnFailover: 100,
+      connectTimeout: 10000,
     });
 
-    // 增强错误处理
     this.redis.on('error', (error: Error) => {
       console.error('Redis connection error:', error);
-      // 记录错误但不中断应用
     });
 
     this.redis.on('connect', () => {
       console.log('Connected to Redis');
     });
-
-    this.redis.on('ready', () => {
-      console.log('Redis is ready');
-    });
-
-    this.redis.on('close', () => {
-      console.log('Redis connection closed');
-    });
-
-    this.redis.on('reconnecting', () => {
-      console.log('Redis reconnecting...');
-    });
   }
 
-  // 获取会话 - 移除不活跃用户清理逻辑
+  // 获取会话
   async getSession(sessionId: string): Promise<SessionData | null> {
     try {
       const sessionData = await this.redis.get(`${this.SESSION_PREFIX}${sessionId}`);
       if (!sessionData) return null;
 
       const session = JSON.parse(sessionData) as SessionData;
+      
+      // 清理非活跃用户（60秒心跳检测）
+      const now = Date.now();
+      const activeUsers = session.users.filter(
+        (user) => now - user.lastSeen < 60000
+      );
+
+      if (activeUsers.length !== session.users.length) {
+        const updatedSession = { ...session, users: activeUsers };
+        await this.redis.setex(
+          `${this.SESSION_PREFIX}${sessionId}`, 
+          this.SESSION_TTL, 
+          JSON.stringify(updatedSession)
+        );
+        return updatedSession;
+      }
+
       return session;
     } catch (error) {
       console.error('Failed to get session:', error);
-      // 返回null而不是抛出错误，避免级联失败
       return null;
     }
   }
@@ -103,43 +91,37 @@ export class RedisSessionStore {
     userId: string,
     userName: string
   ): Promise<SessionData> {
-    try {
-      const now = Date.now();
+    const now = Date.now();
 
-      const hostUser: User = {
-        id: userId,
-        name: userName,
-        role: "host",
-        vote: null,
-        hasVoted: false,
-        lastSeen: now,
-      };
+    const hostUser: User = {
+      id: userId,
+      name: userName,
+      role: "host",
+      vote: null,
+      hasVoted: false,
+      lastSeen: now,
+    };
 
-      const newSession: SessionData = {
-        id: sessionId,
-        users: [hostUser],
-        revealed: false,
-        votes: {},
-        createdAt: now,
-        hostId: userId,
-        template: {
-          type: "fibonacci",
-          customCards: "☕️,1,2,3,5,8,13",
-        },
-      };
+    const newSession: SessionData = {
+      id: sessionId,
+      users: [hostUser],
+      revealed: false,
+      votes: {},
+      createdAt: now,
+      hostId: userId,
+      template: {
+        type: "fibonacci",
+        customCards: "☕️,1,2,3,5,8,13",
+      },
+    };
 
-      await this.redis.setex(
-        `${this.SESSION_PREFIX}${sessionId}`, 
-        this.SESSION_TTL, 
-        JSON.stringify(newSession)
-      );
+    await this.redis.setex(
+      `${this.SESSION_PREFIX}${sessionId}`, 
+      this.SESSION_TTL, 
+      JSON.stringify(newSession)
+    );
 
-      console.log(`Session created successfully: ${sessionId}`);
-      return newSession;
-    } catch (error) {
-      console.error(`Failed to create session ${sessionId}:`, error);
-      throw error;
-    }
+    return newSession;
   }
 
   // 加入会话
@@ -355,28 +337,18 @@ export class RedisSessionStore {
   }
 
   // 转移主持人权限
-  async transferHostRole(sessionId: string, currentHostId: string): Promise<SessionData | null> {
+  async transferHostRole(sessionId: string, currentHostId: string, newHostId: string): Promise<SessionData | null> {
     return this.updateSession(sessionId, (session) => {
       if (session.hostId !== currentHostId) {
         return session;
       }
 
-      // 找到第一个attendance用户
-      const firstAttendance = session.users.find(
-        (user) => user.role === "attendance" && user.id !== currentHostId
-      );
-
-      if (!firstAttendance) {
-        // 如果没有其他attendance用户，保持原会话不变
-        return session;
-      }
-
-      // 更新hostId和用户角色
       const updatedUsers = session.users.map((user) => {
-        if (user.id === firstAttendance.id) {
-          return { ...user, role: "host" as UserRole };
-        } else if (user.id === currentHostId) {
+        if (user.id === currentHostId) {
           return { ...user, role: "attendance" as UserRole };
+        }
+        if (user.id === newHostId) {
+          return { ...user, role: "host" as UserRole };
         }
         return user;
       });
@@ -384,94 +356,30 @@ export class RedisSessionStore {
       return {
         ...session,
         users: updatedUsers,
-        hostId: firstAttendance.id,
+        hostId: newHostId,
       };
     });
   }
 
-  // 新增：从会话中移除用户
-  async removeUserFromSession(sessionId: string, userId: string): Promise<SessionData | null> {
-    const lockKey = `${this.SESSION_LOCK_PREFIX}${sessionId}`;
-    
-    // 尝试获取锁
-    const lock = await this.redis.set(lockKey, '1', 'PX', 5000, 'NX');
-    
-    if (!lock) {
-      throw new Error('Session is locked, please retry');
-    }
-
-    try {
-      const session = await this.getSession(sessionId);
-      if (!session) throw new Error('Session not found');
-      
-      // 找到要移除的用户
-      const userToRemove = session.users.find(user => user.id === userId);
-      if (!userToRemove) {
-        return session; // 用户不存在，返回原会话
-      }
-
-      // 移除用户
-      const updatedUsers = session.users.filter(user => user.id !== userId);
-
-      // 如果移除的是主持人，需要转移主持人权限
-      if (userToRemove.role === "host") {
-        const firstAttendance = updatedUsers.find(user => user.role === "attendance");
-        if (firstAttendance) {
-          // 将第一个attendance用户设为主持人
-          const finalUsers = updatedUsers.map(user => 
-            user.id === firstAttendance.id ? { ...user, role: "host" as UserRole } : user
-          );
-          const updatedSession = {
-            ...session,
-            users: finalUsers,
-            hostId: firstAttendance.id,
-          };
-          await this.redis.setex(
-            `${this.SESSION_PREFIX}${sessionId}`, 
-            this.SESSION_TTL, 
-            JSON.stringify(updatedSession)
-          );
-          return updatedSession;
-        } else {
-          // 没有其他用户，删除会话
-          await this.redis.del(`${this.SESSION_PREFIX}${sessionId}`);
-          return null;
-        }
-      }
-
-      const updatedSession = {
-        ...session,
-        users: updatedUsers,
-      };
-      
-      await this.redis.setex(
-        `${this.SESSION_PREFIX}${sessionId}`, 
-        this.SESSION_TTL, 
-        JSON.stringify(updatedSession)
-      );
-      
-      return updatedSession;
-    } finally {
-      // 释放锁
-      await this.redis.del(lockKey);
-    }
-  }
-
-  // 清理过期会话 - 只清理完全没有用户的会话
+  // 清理过期会话
   async cleanupExpiredSessions(): Promise<void> {
     try {
       const keys = await this.redis.keys(`${this.SESSION_PREFIX}*`);
+      const now = Date.now();
       
       for (const key of keys) {
         const sessionData = await this.redis.get(key);
         if (sessionData) {
           const session = JSON.parse(sessionData) as SessionData;
+          const activeUsers = session.users.filter(
+            (user) => now - user.lastSeen < 60000
+          );
           
-          // 只清理完全没有用户的会话
-          if (session.users.length === 0) {
+          if (activeUsers.length === 0) {
+            // 没有活跃用户，删除会话
             await this.redis.del(key);
             await this.redis.del(`${this.CONNECTION_PREFIX}${session.id}`);
-            console.log(`Cleaned up empty session: ${session.id}`);
+            console.log(`Cleaned up expired session: ${session.id}`);
           }
         }
       }
@@ -517,4 +425,4 @@ export const redisSessionStore = new RedisSessionStore();
 // 定期清理过期会话
 setInterval(() => {
   redisSessionStore.cleanupExpiredSessions();
-}, 300000); // 每5分钟清理一次 
+}, 60000); // 每分钟清理一次 

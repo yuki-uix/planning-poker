@@ -14,7 +14,6 @@ export interface PointEstimationToolState {
   copied: boolean;
   isRestoring: boolean;
   showSessionErrorModal: boolean;
-  errorMessage: string | null;
 }
 
 export interface PointEstimationToolHandlers {

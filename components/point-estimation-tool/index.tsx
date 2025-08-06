@@ -8,7 +8,6 @@ import { TemplateSettings } from "@/components/template-settings";
 import { UserStatus } from "@/components/user-status";
 import { VotingCards } from "@/components/voting-cards";
 import { usePointEstimationTool } from "./usePointEstimationTool";
-import { ConnectionDebugPanel } from "../connection-debug-panel";
 
 export function PointEstimationTool() {
   const {
@@ -24,7 +23,6 @@ export function PointEstimationTool() {
     copied,
     isRestoring,
     showSessionErrorModal,
-    errorMessage,
     setUserName,
     setSelectedRole,
     setShowSessionErrorModal,
@@ -72,17 +70,7 @@ export function PointEstimationTool() {
           isOpen={showSessionErrorModal}
           onClose={() => setShowSessionErrorModal(false)}
           onBackToHost={handleBackToHost}
-          errorMessage={errorMessage || undefined}
         />
-        {/* 调试面板 - 仅在开发环境显示 */}
-        {process.env.NODE_ENV === 'development' && (
-          <ConnectionDebugPanel
-            sessionId={sessionId}
-            userId={currentUser}
-            isConnected={isConnected}
-            connectionType="http"
-          />
-        )}
       </>
     );
   }
@@ -133,12 +121,7 @@ export function PointEstimationTool() {
             onResetVotes={handleResetVotes}
           />
 
-          {session.revealed && stats && (
-            <ResultsDisplay
-              session={session}
-              stats={stats}
-            />
-          )}
+          {stats && <ResultsDisplay session={session} stats={stats} />}
         </div>
       </div>
 
@@ -146,18 +129,7 @@ export function PointEstimationTool() {
         isOpen={showSessionErrorModal}
         onClose={() => setShowSessionErrorModal(false)}
         onBackToHost={handleBackToHost}
-        errorMessage={errorMessage || undefined}
       />
-
-      {/* 调试面板 - 仅在开发环境显示 */}
-      {process.env.NODE_ENV === 'development' && (
-        <ConnectionDebugPanel
-          sessionId={sessionId}
-          userId={currentUser}
-          isConnected={isConnected}
-          connectionType="http"
-        />
-      )}
     </>
   );
 }
