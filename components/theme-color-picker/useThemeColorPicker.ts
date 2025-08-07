@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useLanguage } from "../../hooks/use-language";
 import type { ThemeColorPickerProps } from "./types";
 

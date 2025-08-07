@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 import { ControlButtons } from "../control-buttons";
 import { LoginForm } from "../login-form";
 import { ResultsDisplay } from "../results-display";

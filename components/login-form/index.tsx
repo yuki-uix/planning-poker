@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import {
