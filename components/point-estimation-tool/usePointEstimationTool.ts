@@ -144,7 +144,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
       sessionState.session,
       computedValues.isHost
     );
-  }, [sessionState.session, userState, sessionActions, computedValues.isHost, sessionState.pollSession]);
+  }, [sessionState.session, userState, sessionActions, computedValues.isHost]);
 
   // 处理重置投票
   const handleResetVotes = useCallback(async () => {
