@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import React from "react";
 import "./globals.css";
 import { LanguageProvider } from "../hooks/use-language";
 import { ThemeProvider } from "../components/theme-provider";

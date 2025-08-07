@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeColorPicker } from "@/components/theme-color-picker";
 import { Badge } from "@/components/ui/badge";

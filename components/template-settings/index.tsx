@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,10 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  ESTIMATION_TEMPLATES,
-  TemplateType
-} from "@/types/estimation";
+import { ESTIMATION_TEMPLATES, TemplateType } from "@/types/estimation";
 import { Settings } from "lucide-react";
 import type { TemplateSettingsProps } from "./types";
 import { useTemplateSettings } from "./useTemplateSettings";

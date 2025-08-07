@@ -36,6 +36,8 @@ const nextConfig = {
     // 添加额外的解析规则
     config.resolve.extensions = ['.js', '.jsx', '.ts', '.tsx', '.json'];
     
+    // React is already resolved by Next.js, no need to manually resolve
+    
     return config;
   },
 }
