@@ -41,7 +41,6 @@ export class RedisSessionStore {
       lazyConnect: false, // 改为false，立即连接
       enableOfflineQueue: true, // 改为true，允许离线队列
       enableReadyCheck: true,
-      retryDelayOnFailover: 100,
       connectTimeout: 10000,
     });
 

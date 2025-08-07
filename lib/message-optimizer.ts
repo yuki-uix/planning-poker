@@ -22,7 +22,7 @@ export interface OptimizedMessage {
 }
 
 export class MessageOptimizer {
-  private messageBuffer: Map<string, Record<string, unknown>[]> = new Map();
+  private messageBuffer: Map<string, Array<{ type: string; data: Record<string, unknown>; timestamp: number; }>> = new Map();
   private batchTimers: Map<string, NodeJS.Timeout> = new Map();
   private batchInterval: number;
   private enableCompression: boolean;
@@ -112,7 +112,8 @@ export class MessageOptimizer {
     }
 
     this.messageBuffer.get(sessionId)!.push({
-      ...message,
+      type: (message.type as string) || 'unknown',
+      data: message,
       timestamp: Date.now()
     });
   }
@@ -182,7 +183,7 @@ export class MessageOptimizer {
       return [batchMessage];
     }
 
-    return batchMessage.messages || [];
+    return (batchMessage.messages as Record<string, unknown>[]) || [];
   }
 
   // 生成批处理ID
