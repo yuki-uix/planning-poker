@@ -1,5 +1,5 @@
-import type { Session, TemplateType } from "@/types/estimation";
-import type { UserRole } from "@/lib/session-store";
+import type { Session, TemplateType } from "../../types/estimation";
+import type { UserRole } from "../../lib/session-store";
 
 export interface PointEstimationToolState {
   currentUser: string;

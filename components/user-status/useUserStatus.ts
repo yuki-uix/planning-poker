@@ -1,6 +1,6 @@
-import { useLanguage } from "@/hooks/use-language";
+import { useLanguage } from "../../hooks/use-language";
 import type { UserStatusProps } from "./types";
-import type { User } from "@/types/estimation";
+import type { User } from "../../types/estimation";
 
 export function useUserStatus(props: UserStatusProps) {
   const { session, currentUser } = props;

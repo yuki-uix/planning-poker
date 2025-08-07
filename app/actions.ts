@@ -11,7 +11,7 @@ import {
   updateSessionTemplate,
   transferHostRole,
   UserRole,
-} from "@/lib/session-store";
+} from "../lib/session-store";
 import { v4 as uuidv4 } from "uuid";
 
 export async function createSessionWithAutoId(

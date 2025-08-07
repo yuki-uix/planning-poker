@@ -1,7 +1,7 @@
 // WebSocket客户端管理器
 // 提供稳定的实时连接，支持自动重连、心跳保活、消息队列等功能
 
-import { Session } from '@/types/estimation';
+import { Session } from '../types/estimation';
 
 export interface WebSocketMessage {
   type: 'vote' | 'reveal' | 'reset' | 'join' | 'leave' | 'heartbeat' | 'template_update' | 'session_update' | 'heartbeat_ack';

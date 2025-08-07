@@ -1,9 +1,8 @@
 import {
   Session,
   EstimationStats,
-  ESTIMATION_TEMPLATES,
   TemplateType,
-} from "@/types/estimation";
+} from "../types/estimation";
 
 export function getCurrentEstimationCards(session: Session): string[] {
   const selectedTemplate =

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { ConnectionManager, ConnectionState } from '@/lib/connection-manager';
-import { WebSocketMessage } from '@/lib/websocket-client';
-import { Session } from '@/types/estimation';
+import { ConnectionManager, ConnectionState } from '../lib/connection-manager';
+import { WebSocketMessage } from '../lib/websocket-client';
+import { Session } from '../types/estimation';
 
 interface UseConnectionManagerOptions {
   sessionId: string;

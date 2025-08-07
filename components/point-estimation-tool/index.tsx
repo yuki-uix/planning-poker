@@ -1,12 +1,12 @@
 "use client";
-import { ControlButtons } from "@/components/control-buttons";
-import { LoginForm } from "@/components/login-form";
-import { ResultsDisplay } from "@/components/results-display";
-import { SessionHeader } from "@/components/session-header";
-import { SessionErrorModal } from "@/components/session-error-modal";
-import { TemplateSettings } from "@/components/template-settings";
-import { UserStatus } from "@/components/user-status";
-import { VotingCards } from "@/components/voting-cards";
+import { ControlButtons } from "../control-buttons";
+import { LoginForm } from "../login-form";
+import { ResultsDisplay } from "../results-display";
+import { SessionHeader } from "../session-header";
+import { SessionErrorModal } from "../session-error-modal";
+import { TemplateSettings } from "../template-settings";
+import { UserStatus } from "../user-status";
+import { VotingCards } from "../voting-cards";
 import { usePointEstimationTool } from "./usePointEstimationTool";
 
 export function PointEstimationTool() {
@@ -133,3 +133,5 @@ export function PointEstimationTool() {
     </>
   );
 }
+
+export default PointEstimationTool;

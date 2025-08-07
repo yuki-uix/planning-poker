@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useLoginForm } from "./useLoginForm";
 import type { LoginFormProps } from "./types";
-import { UserRole } from "@/lib/session-store";
+import { UserRole } from "../../lib/session-store";
 import { EyeOff, User } from "lucide-react";
 
 export function LoginForm(props: LoginFormProps) {

@@ -1,4 +1,4 @@
-import type { Session, TemplateType } from "@/types/estimation";
+import type { Session, TemplateType } from "../../types/estimation";
 
 export interface TemplateSettingsProps {
   session: Session;

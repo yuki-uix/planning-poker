@@ -12,7 +12,7 @@ import {
   detectLanguage,
   getTranslation,
   Translations,
-} from "@/lib/i18n";
+} from "../lib/i18n";
 
 interface LanguageContextType {
   language: Language;

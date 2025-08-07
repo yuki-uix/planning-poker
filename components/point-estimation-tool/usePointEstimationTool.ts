@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from "react";
-import { Session, TemplateType } from "@/types/estimation";
+import { Session, TemplateType } from "../../types/estimation";
 import {
   useUserState,
   useSessionState,
@@ -15,7 +15,7 @@ import type {
 export function usePointEstimationTool(): PointEstimationToolState &
   PointEstimationToolHandlers & {
     stats: ReturnType<
-      typeof import("@/lib/estimation-utils").calculateStats
+      typeof import("../../lib/estimation-utils").calculateStats
     > | null;
     allUsersVoted: boolean;
     isHost: boolean;
@@ -56,7 +56,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
       if (result) {
         userState.setCurrentUser(userId);
         // 从 getUserData 获取 sessionId
-        const userData = await import("@/lib/persistence").then((m) =>
+        const userData = await import("../../lib/persistence").then((m) =>
           m.getUserData()
         );
         if (userData) {
@@ -74,10 +74,8 @@ export function usePointEstimationTool(): PointEstimationToolState &
     }
   }, [
     userState.userName,
-    userState.setIsJoined,
     sessionState,
     sessionActions,
-    userState,
   ]);
 
   // 处理加入会话
@@ -111,11 +109,9 @@ export function usePointEstimationTool(): PointEstimationToolState &
     userState.userName,
     userState.sessionId,
     userState.selectedRole,
-    userState.setIsJoined,
     sessionState,
     sessionActions,
     uiState,
-    userState,
   ]);
 
   // 处理投票
@@ -148,7 +144,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
       sessionState.session,
       computedValues.isHost
     );
-  }, [sessionState.session, userState, sessionActions, computedValues.isHost]);
+  }, [sessionState.session, userState, sessionActions, computedValues.isHost, sessionState.pollSession]);
 
   // 处理重置投票
   const handleResetVotes = useCallback(async () => {
@@ -161,7 +157,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
       userState.setSelectedVote,
       sessionState.pollSession
     );
-  }, [sessionState.session, userState, sessionActions, computedValues.isHost]);
+  }, [sessionState.session, userState, sessionActions, computedValues.isHost, sessionState.pollSession]);
 
   // 处理模板变更
   const handleTemplateChange = useCallback(
@@ -177,7 +173,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
         sessionState.pollSession
       );
     },
-    [sessionState.session, userState, sessionActions, computedValues.isHost]
+    [sessionState.session, userState, sessionActions, computedValues.isHost, sessionState.pollSession]
   );
 
   // 处理自定义卡片变更
@@ -194,7 +190,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
         sessionState.pollSession
       );
     },
-    [sessionState.session, userState, sessionActions, computedValues.isHost]
+    [sessionState.session, userState, sessionActions, computedValues.isHost, sessionState.pollSession]
   );
 
   // 处理登出

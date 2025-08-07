@@ -1,4 +1,4 @@
-import { UserRole } from "@/lib/session-store";
+import { UserRole } from "../lib/session-store";
 
 export interface User {
   id: string;

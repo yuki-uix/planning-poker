@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { RedisSessionStore } from "@/lib/redis-session-store";
-import { ConnectionPool } from "@/lib/connection-pool";
-import { HeartbeatManager } from "@/lib/heartbeat-manager";
-import { MessageOptimizer } from "@/lib/message-optimizer";
+import { RedisSessionStore } from "../../../lib/redis-session-store";
+import { ConnectionPool } from "../../../lib/connection-pool";
+import { HeartbeatManager } from "../../../lib/heartbeat-manager";
+import { MessageOptimizer } from "../../../lib/message-optimizer";
 
 // Dynamic imports to handle server-only dependencies
 let redisSessionStore: RedisSessionStore | null = null;
@@ -14,16 +14,16 @@ let messageOptimizer: MessageOptimizer | null = null;
 const initializeServerModules = async () => {
   if (typeof window === "undefined") {
     try {
-      const redisModule = await import("@/lib/redis-session-store");
+      const redisModule = await import("../../../lib/redis-session-store");
       redisSessionStore = redisModule.redisSessionStore;
 
-      const poolModule = await import("@/lib/connection-pool");
+      const poolModule = await import("../../../lib/connection-pool");
       connectionPool = poolModule.connectionPool;
 
-      const heartbeatModule = await import("@/lib/heartbeat-manager");
+      const heartbeatModule = await import("../../../lib/heartbeat-manager");
       heartbeatManager = heartbeatModule.heartbeatManager;
 
-      const optimizerModule = await import("@/lib/message-optimizer");
+      const optimizerModule = await import("../../../lib/message-optimizer");
       messageOptimizer = optimizerModule.messageOptimizer;
     } catch (error) {
       console.warn("Failed to import server modules:", error);

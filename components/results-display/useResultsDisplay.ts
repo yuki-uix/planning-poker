@@ -1,6 +1,6 @@
-import { useLanguage } from "@/hooks/use-language";
+import { useLanguage } from "../../hooks/use-language";
 import type { ResultsDisplayProps } from "./types";
-import { ESTIMATION_TEMPLATES, TemplateType } from "@/types/estimation";
+import { ESTIMATION_TEMPLATES, TemplateType } from "../../types/estimation";
 
 export function useResultsDisplay(props: ResultsDisplayProps) {
   const { session, stats } = props;

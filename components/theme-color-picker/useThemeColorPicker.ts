@@ -1,6 +1,5 @@
-import * as React from "react";
-import { useTheme } from "next-themes";
-import { useLanguage } from "@/hooks/use-language";
+import { useState } from "react";
+import { useLanguage } from "../../hooks/use-language";
 import type { ThemeColorPickerProps } from "./types";
 
 export const themeColors = [
@@ -13,9 +12,8 @@ export const themeColors = [
 ];
 
 export function useThemeColorPicker(props: ThemeColorPickerProps) {
-  useTheme();
   const { language } = useLanguage();
-  const [colorTheme, setColorTheme] = React.useState("cyan");
+  const [colorTheme, setColorTheme] = useState("cyan");
 
   React.useEffect(() => {
     const savedColorTheme = localStorage.getItem("color-theme");

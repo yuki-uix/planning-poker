@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
-import { Session } from "@/types/estimation";
-import { getSessionData, heartbeat } from "@/app/actions";
-import { updateSessionState } from "@/lib/persistence";
+import { Session } from "../../../types/estimation";
+import { getSessionData, heartbeat } from "../../../app/actions";
+import { updateSessionState } from "../../../lib/persistence";
 
 export interface SessionState {
   session: Session | null;
