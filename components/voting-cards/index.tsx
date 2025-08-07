@@ -27,9 +27,9 @@ export function VotingCards(props: VotingCardsProps) {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-4 md:grid-cols-7 gap-4">
-            {currentEstimationCards.map((card: string) => (
+            {currentEstimationCards.map((card: string, index: number) => (
               <Button
-                key={card}
+                key={`${card}-${index}`}
                 variant="outline"
                 className="h-20 text-lg font-bold opacity-60 cursor-not-allowed"
                 disabled={true}
@@ -60,9 +60,9 @@ export function VotingCards(props: VotingCardsProps) {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-4 md:grid-cols-7 gap-4">
-          {currentEstimationCards.map((card: string) => (
+          {currentEstimationCards.map((card: string, index: number) => (
             <Button
-              key={card}
+              key={`${card}-${index}`}
               variant={selectedVote === card ? "default" : "outline"}
               className="h-20 text-lg font-bold"
               onClick={() => onCastVote(card)}

@@ -29,10 +29,10 @@ export function ResultsDisplay(props: ResultsDisplayProps) {
                 {t.results.distribution}
               </h3>
               <div className="grid grid-cols-4 md:grid-cols-7 gap-4">
-                {currentEstimationCards.map((card: string) => {
+                {currentEstimationCards.map((card: string, index: number) => {
                   const count = stats.distribution[card] || 0;
                   return (
-                    <div key={card} className="text-center">
+                    <div key={`${card}-${index}`} className="text-center">
                       <div className="text-2xl font-bold mb-1">{card}</div>
                       <div className="text-sm text-muted-foreground">
                         {count} {t.results.votes}

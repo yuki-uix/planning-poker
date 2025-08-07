@@ -120,8 +120,8 @@ export function TemplateSettings(props: TemplateSettingsProps) {
                 {t.templates.preview}
               </label>
               <div className="flex flex-wrap gap-2">
-                {currentEstimationCards.map((card) => (
-                  <Badge key={card} variant="outline" className="text-sm">
+                {currentEstimationCards.map((card, index) => (
+                  <Badge key={`${card}-${index}`} variant="outline" className="text-sm">
                     {card}
                   </Badge>
                 ))}
