@@ -2,6 +2,7 @@ import {
   Session,
   EstimationStats,
   TemplateType,
+  ESTIMATION_TEMPLATES,
 } from "../types/estimation";
 
 export function getCurrentEstimationCards(session: Session): string[] {

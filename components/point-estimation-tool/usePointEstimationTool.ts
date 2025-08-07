@@ -243,7 +243,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
     handleCustomCardsChange,
     handleLogout,
     handleBackToHost,
-    copyShareLink: uiState.copyShareLink,
+    copyShareLink: () => uiState.copyShareLink(userState.sessionId),
     stats: computedValues.stats,
     allUsersVoted: computedValues.allUsersVoted,
     isHost: computedValues.isHost,
