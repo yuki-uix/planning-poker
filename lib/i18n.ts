@@ -64,6 +64,12 @@ export interface Translations {
     currentCards: string;
     preview: string;
     hostOnly: string;
+    confirm: string;
+    validation: {
+      empty: string;
+      minCards: string;
+      invalidFormat: string;
+    };
   };
 
   // 投票
@@ -176,6 +182,12 @@ const translations: Record<Language, Translations> = {
       currentCards: "当前卡片",
       preview: "当前模板预览",
       hostOnly: "仅主持人可修改",
+      confirm: "确认更新",
+      validation: {
+        empty: "估点值不能为空",
+        minCards: "至少需要2张卡片",
+        invalidFormat: "格式错误：只允许数字、☕️ 或 ? 符号",
+      },
     },
     voting: {
       title: "选择你的估点",
@@ -278,6 +290,12 @@ const translations: Record<Language, Translations> = {
       currentCards: "Current Cards",
       preview: "Current Template Preview",
       hostOnly: "Host only",
+      confirm: "Update",
+      validation: {
+        empty: "Estimation values cannot be empty",
+        minCards: "At least 2 cards are required",
+        invalidFormat: "Invalid format: only numbers, ☕️ or ? symbols are allowed",
+      },
     },
     voting: {
       title: "Select Your Estimate",

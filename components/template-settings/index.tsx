@@ -29,11 +29,13 @@ export function TemplateSettings(props: TemplateSettingsProps) {
     showTemplateSettings,
     setShowTemplateSettings,
     selectedTemplate,
-    customCards,
+    customCardsInput,
+    setCustomCardsInput,
+    validationError,
+    handleConfirmCustomCards,
     currentEstimationCards,
     isHost,
     onTemplateChange,
-    onCustomCardsChange,
   } = useTemplateSettings(props);
 
   if (!isHost) return null;
@@ -103,11 +105,26 @@ export function TemplateSettings(props: TemplateSettingsProps) {
               <label className="text-sm font-medium">
                 {t.templates.customValues}
               </label>
-              <Input
-                placeholder={t.templates.customPlaceholder}
-                value={customCards}
-                onChange={(e) => onCustomCardsChange(e.target.value)}
-              />
+              <div className="space-y-2">
+                <Input
+                  placeholder={t.templates.customPlaceholder}
+                  value={customCardsInput}
+                  onChange={(e) => setCustomCardsInput(e.target.value)}
+                />
+                {validationError && (
+                  <div className="text-xs text-red-600">
+                    {validationError}
+                  </div>
+                )}
+                <Button
+                  onClick={handleConfirmCustomCards}
+                  size="sm"
+                  variant="outline"
+                  className="w-full"
+                >
+                  {t.templates.confirm}
+                </Button>
+              </div>
               <div className="text-xs text-muted-foreground">
                 {t.templates.currentCards}: {currentEstimationCards.join(", ")}
               </div>
