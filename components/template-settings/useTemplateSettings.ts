@@ -1,7 +1,7 @@
-import { useLanguage } from "@/hooks/use-language";
+import { useLanguage } from "../../hooks/use-language";
 import { useState } from "react";
 import type { TemplateSettingsProps } from "./types";
-import { ESTIMATION_TEMPLATES, TemplateType } from "@/types/estimation";
+import { ESTIMATION_TEMPLATES, TemplateType } from "../../types/estimation";
 
 export function useTemplateSettings(props: TemplateSettingsProps) {
   const { session } = props;

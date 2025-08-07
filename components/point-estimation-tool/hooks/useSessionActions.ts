@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { UserRole } from "@/lib/session-store";
-import { Session, TemplateType } from "@/types/estimation";
+import { UserRole } from "../../../lib/session-store";
+import { Session, TemplateType } from "../../../types/estimation";
 import {
   createSessionWithAutoId,
   joinSessionAsRole,
@@ -9,8 +9,8 @@ import {
   resetVotes,
   updateTemplate,
   transferHost,
-} from "@/app/actions";
-import { saveUserData, updateUserVote } from "@/lib/persistence";
+} from "../../../app/actions";
+import { saveUserData, updateUserVote } from "../../../lib/persistence";
 
 export interface SessionActions {
   handleCreateSession: (userName: string, userId: string) => Promise<boolean>;

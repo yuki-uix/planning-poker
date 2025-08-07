@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Crown, EyeOff, User as UserIcon } from "lucide-react";
 import type { UserStatusProps } from "./types";
 import { useUserStatus } from "./useUserStatus";
-import { User } from "@/types/estimation";
+import { User } from "../../types/estimation";
 
 export function UserStatus(props: UserStatusProps) {
   const { t, votedUsers, notVotedUsers, guestUsers, session, currentUser } =

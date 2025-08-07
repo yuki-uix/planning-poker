@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { WebSocketClient, WebSocketMessage } from '@/lib/websocket-client';
-import { Session } from '@/types/estimation';
+import { WebSocketClient, WebSocketMessage } from '../lib/websocket-client';
+import { Session } from '../types/estimation';
 
 interface UseWebSocketOptions {
   sessionId: string;

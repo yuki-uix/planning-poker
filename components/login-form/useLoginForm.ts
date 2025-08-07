@@ -1,4 +1,4 @@
-import { useLanguage } from "@/hooks/use-language";
+import { useLanguage } from "../../hooks/use-language";
 import type { LoginFormProps } from "./types";
 
 export function useLoginForm(props: LoginFormProps) {

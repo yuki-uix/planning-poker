@@ -1,4 +1,4 @@
-import { useLanguage } from "@/hooks/use-language";
+import { useLanguage } from "../../hooks/use-language";
 import type { SessionHeaderProps } from "./types";
 
 export function useSessionHeader(props: SessionHeaderProps) {

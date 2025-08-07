@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { calculateStats, checkAllUsersVoted } from "@/lib/estimation-utils";
-import { Session } from "@/types/estimation";
+import { calculateStats, checkAllUsersVoted } from "../../../lib/estimation-utils";
+import { Session } from "../../../types/estimation";
 
 export interface ComputedValues {
   stats: ReturnType<typeof calculateStats> | null;

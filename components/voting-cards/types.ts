@@ -1,4 +1,4 @@
-import type { Session } from "@/types/estimation";
+import type { Session } from "../../types/estimation";
 
 export interface VotingCardsProps {
   session: Session;

@@ -1,4 +1,4 @@
-import type { UserRole } from "@/lib/session-store";
+import type { UserRole } from "../../lib/session-store";
 
 export interface LoginFormProps {
   sessionId?: string;

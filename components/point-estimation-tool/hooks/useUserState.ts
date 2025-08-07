@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { UserRole } from "@/lib/session-store";
+import { UserRole } from "../../../lib/session-store";
 import {
   getUserData,
   clearAllData,
   updateUserVote,
   migrateFromOldStorage,
-} from "@/lib/persistence";
-import { getSessionData, castVote } from "@/app/actions";
+} from "../../../lib/persistence";
+import { getSessionData, castVote } from "../../../app/actions";
 
 export interface UserState {
   currentUser: string;

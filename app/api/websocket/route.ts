@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server';
 import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
-import { redisSessionStore } from '@/lib/redis-session-store';
-import { connectionPool } from '@/lib/connection-pool';
-import { heartbeatManager } from '@/lib/heartbeat-manager';
+import { redisSessionStore } from '../../../lib/redis-session-store';
+import { connectionPool } from '../../../lib/connection-pool';
+import { heartbeatManager } from '../../../lib/heartbeat-manager';
 
 // WebSocket服务器实例
 let wss: WebSocketServer | null = null;

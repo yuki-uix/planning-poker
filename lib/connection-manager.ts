@@ -3,7 +3,7 @@
 // 提供更稳定的连接体验
 
 import { WebSocketClient, WebSocketMessage } from './websocket-client';
-import { Session } from '@/types/estimation';
+import { Session } from '../types/estimation';
 
 export interface ConnectionConfig {
   sessionId: string;

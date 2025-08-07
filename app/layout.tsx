@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { LanguageProvider } from "@/hooks/use-language";
-import { ThemeProvider } from "@/components/theme-provider";
+import { LanguageProvider } from "../hooks/use-language";
+import { ThemeProvider } from "../components/theme-provider";
 
 export const metadata: Metadata = {
   title: "Point Estimation Tool",
