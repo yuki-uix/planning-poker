@@ -86,6 +86,7 @@ export function SessionHeader(props: SessionHeaderProps) {
               size="sm"
               onClick={onCopyShareLink}
               className="flex items-center gap-2"
+              data-guidance-share
             >
               {copied ? (
                 <Check className="w-4 h-4 text-green-500" />

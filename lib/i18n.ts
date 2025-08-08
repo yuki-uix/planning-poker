@@ -122,6 +122,32 @@ export interface Translations {
       closeButton: string;
     };
   };
+
+  // 首次使用模态框
+  firstTimeModal: {
+    title: string;
+    description: string;
+    guideDescription: string;
+    step1: string;
+    step2: string;
+    step3: string;
+    step4: string;
+    skipButton: string;
+    startButton: string;
+  };
+
+  // 引导教程
+  guidedTour: {
+    previousButton: string;
+    nextButton: string;
+    completeButton: string;
+  };
+
+  // 庆祝动画
+  celebration: {
+    title: string;
+    message: string;
+  };
 }
 
 const translations: Record<Language, Translations> = {
@@ -229,6 +255,26 @@ const translations: Record<Language, Translations> = {
         backToHostButton: "回到主持人页面",
         closeButton: "关闭",
       },
+    },
+    firstTimeModal: {
+      title: "欢迎使用敏捷扑克！",
+      description: "这是您首次创建会话吗？",
+      guideDescription: "我们将逐步指导您完成整个流程：",
+      step1: "输入您的姓名",
+      step2: "与团队分享会话",
+      step3: "设置估算模板",
+      step4: "揭示投票结果",
+      skipButton: "跳过",
+      startButton: "开始引导",
+    },
+    guidedTour: {
+      previousButton: "上一步",
+      nextButton: "下一步",
+      completeButton: "完成",
+    },
+    celebration: {
+      title: "恭喜您！🎉",
+      message: "您已完成引导教程！现在您已经准备好主持您的第一场敏捷扑克会话了。",
     },
   },
   en: {
@@ -338,6 +384,26 @@ const translations: Record<Language, Translations> = {
         backToHostButton: "Back to Host Page",
         closeButton: "Close",
       },
+    },
+    firstTimeModal: {
+      title: "Welcome to Planning Poker!",
+      description: "Is this your first time creating a session?",
+      guideDescription: "We'll guide you through the process step by step:",
+      step1: "Enter your name",
+      step2: "Share session with team",
+      step3: "Set up estimation template",
+      step4: "Reveal voting results",
+      skipButton: "Skip",
+      startButton: "Start Guide",
+    },
+    guidedTour: {
+      previousButton: "Previous",
+      nextButton: "Next",
+      completeButton: "Complete",
+    },
+    celebration: {
+      title: "Congratulations! 🎉",
+      message: "You've completed the guided tour! You're now ready to host your first planning poker session.",
     },
   },
 };

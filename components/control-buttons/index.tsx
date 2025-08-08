@@ -18,6 +18,7 @@ export function ControlButtons(props: ControlButtonsProps) {
         onClick={onRevealVotes}
         disabled={!allUsersVoted || session.revealed}
         className="flex items-center gap-2"
+        data-guidance-reveal
       >
         <Eye className="w-4 h-4" />
         {t.voting.revealButton} (
