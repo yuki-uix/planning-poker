@@ -1,6 +1,9 @@
 "use client";
 import React from "react";
 import { ControlButtons } from "../control-buttons";
+import { FirstTimeModal } from "../first-time-modal";
+import { FireworksCelebration } from "../fireworks-celebration";
+import { GuidedTour } from "../guided-tour";
 import { LoginForm } from "../login-form";
 import { ResultsDisplay } from "../results-display";
 import { SessionHeader } from "../session-header";
@@ -9,8 +12,10 @@ import { TemplateSettings } from "../template-settings";
 import { UserStatus } from "../user-status";
 import { VotingCards } from "../voting-cards";
 import { usePointEstimationTool } from "./usePointEstimationTool";
+import { useUserGuidance } from "../../hooks/use-user-guidance";
 
 export function PointEstimationTool() {
+  const guidance = useUserGuidance();
   const {
     currentUser,
     userName,
@@ -72,6 +77,13 @@ export function PointEstimationTool() {
           onClose={() => setShowSessionErrorModal(false)}
           onBackToHost={handleBackToHost}
         />
+        {!sessionId && (
+          <FirstTimeModal
+            isOpen={guidance.showFirstTimeModal}
+            onStartGuidance={guidance.startGuidance}
+            onSkipGuidance={guidance.skipGuidance}
+          />
+        )}
       </>
     );
   }
@@ -131,6 +143,24 @@ export function PointEstimationTool() {
         onClose={() => setShowSessionErrorModal(false)}
         onBackToHost={handleBackToHost}
       />
+
+      {isHost && (
+        <>
+          <GuidedTour
+            isActive={guidance.isGuidanceActive}
+            currentStep={guidance.currentStep}
+            steps={guidance.guidanceSteps}
+            onNext={guidance.nextStep}
+            onPrevious={guidance.previousStep}
+            onSkip={guidance.skipGuidance}
+            onComplete={guidance.completeGuidance}
+          />
+          <FireworksCelebration
+            isActive={guidance.showFireworks}
+            onComplete={guidance.finishFireworks}
+          />
+        </>
+      )}
     </>
   );
 }

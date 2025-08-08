@@ -41,7 +41,7 @@ export function TemplateSettings(props: TemplateSettingsProps) {
   if (!isHost) return null;
 
   return (
-    <Card>
+    <Card data-guidance-template>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
