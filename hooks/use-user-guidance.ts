@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { userGuidanceStore } from "../lib/user-guidance-store";
 import type { GuidedTourStep } from "../components/guided-tour/types";
 
@@ -86,9 +86,9 @@ export function useUserGuidance() {
     userGuidanceStore.completeGuidance();
   };
 
-  const finishFireworks = () => {
+  const finishFireworks = useCallback(() => {
     setShowFireworks(false);
-  };
+  }, []);
 
   return {
     showFirstTimeModal,
