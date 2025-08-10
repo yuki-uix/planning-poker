@@ -39,7 +39,7 @@ export function SessionHeader(props: SessionHeaderProps) {
             <CardTitle className="text-2xl font-bold text-title">
               {t.main.sessionTitle}: {sessionId}
             </CardTitle>
-            <CardDescription>
+            <CardDescription data-guidance-welcome>
               {t.main.welcome}, {userName}!
               <Badge variant="outline" className="ml-2">
                 {currentUserData?.role === "host" && (
