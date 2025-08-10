@@ -1,12 +1,13 @@
 "use client";
 
 import React from "react";
-import { Sparkles, Star, Award } from "lucide-react";
+import { Sparkles, Star, Award, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useFireworksCelebration } from "./useFireworksCelebration";
 import type { FireworksCelebrationProps } from "./types";
 
 export function FireworksCelebration(props: FireworksCelebrationProps) {
-  const { t, isActive } = useFireworksCelebration(props);
+  const { t, isActive, countdown, handleManualClose } = useFireworksCelebration(props);
 
   if (!isActive) return null;
 
@@ -43,7 +44,17 @@ export function FireworksCelebration(props: FireworksCelebrationProps) {
       </div>
 
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-md mx-4 text-center animate-in slide-in-from-bottom-4 duration-700">
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-md mx-4 text-center animate-in slide-in-from-bottom-4 duration-700 pointer-events-auto relative">
+          {/* Close Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleManualClose}
+            className="absolute top-4 right-4 h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+
           <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
             <Award className="w-8 h-8 text-white" />
           </div>
@@ -55,6 +66,16 @@ export function FireworksCelebration(props: FireworksCelebrationProps) {
           <p className="text-gray-600 mb-4">
             {t.celebration?.message || "You've completed the guided tour! You're now ready to host your first planning poker session."}
           </p>
+          
+          {/* Countdown Hint */}
+          <div className="mb-4">
+            <p className="text-sm text-gray-500">
+              {countdown > 0 
+                ? `This will close automatically in ${countdown} second${countdown !== 1 ? 's' : ''}...`
+                : "Closing..."
+              }
+            </p>
+          </div>
           
           <div className="flex justify-center space-x-1">
             {Array.from({ length: 3 }, (_, i) => (

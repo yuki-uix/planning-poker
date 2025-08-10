@@ -1,10 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLanguage } from "../../hooks/use-language";
 import type { FireworksCelebrationProps } from "./types";
 
 export function useFireworksCelebration(props: FireworksCelebrationProps) {
   const { t } = useLanguage();
   const onCompleteRef = useRef(props.onComplete);
+  const [countdown, setCountdown] = useState(3);
 
   // Keep the callback reference up to date
   useEffect(() => {
@@ -13,16 +14,39 @@ export function useFireworksCelebration(props: FireworksCelebrationProps) {
 
   useEffect(() => {
     if (props.isActive) {
-      const timer = setTimeout(() => {
+      setCountdown(3);
+      
+      // Countdown timer that updates every second
+      const countdownTimer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(countdownTimer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      // Auto-dismiss timer
+      const dismissTimer = setTimeout(() => {
         onCompleteRef.current();
       }, 3000);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearInterval(countdownTimer);
+        clearTimeout(dismissTimer);
+      };
     }
-  }, [props.isActive]); // Only depend on isActive, not onComplete
+  }, [props.isActive]);
+
+  const handleManualClose = () => {
+    onCompleteRef.current();
+  };
 
   return {
     t,
+    countdown,
+    handleManualClose,
     ...props,
   };
 }
