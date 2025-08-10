@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { userGuidanceStore } from "../lib/user-guidance-store";
 import type { GuidedTourStep } from "../components/guided-tour/types";
 
@@ -10,10 +10,10 @@ export function useUserGuidance() {
 
   const guidanceSteps: GuidedTourStep[] = [
     {
-      id: "name-input",
-      title: "Enter Your Name",
-      description: "First, enter your name to identify yourself in the session. This will be displayed to other participants.",
-      target: "#userName",
+      id: "welcome-session",
+      title: "Welcome to Your Session",
+      description: "Great! You've created your planning poker session. Your name is now displayed here and visible to all participants.",
+      target: "[data-guidance-welcome]",
       position: "bottom",
     },
     {
@@ -86,9 +86,9 @@ export function useUserGuidance() {
     userGuidanceStore.completeGuidance();
   };
 
-  const finishFireworks = () => {
+  const finishFireworks = useCallback(() => {
     setShowFireworks(false);
-  };
+  }, []);
 
   return {
     showFirstTimeModal,

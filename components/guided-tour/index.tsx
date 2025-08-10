@@ -28,13 +28,23 @@ export function GuidedTour(props: GuidedTourProps) {
   }
 
   const getTooltipPosition = () => {
-    if (!targetElement) return { top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
-
-    const rect = overlayPosition;
     const tooltipWidth = 320;
     const tooltipHeight = 200;
     const padding = 20;
 
+    // If no target element, center the tooltip
+    if (!targetElement || !overlayPosition.width || !overlayPosition.height) {
+      return {
+        position: "fixed" as const,
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: `${tooltipWidth}px`,
+        zIndex: 10002,
+      };
+    }
+
+    const rect = overlayPosition;
     let top = rect.top;
     let left = rect.left;
 

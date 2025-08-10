@@ -36,6 +36,10 @@ export function useGuidedTour(props: GuidedTourProps) {
           behavior: 'smooth',
           block: 'center',
         });
+      } else {
+        // Clear target element if not found, tooltip will center itself
+        setTargetElement(null);
+        setOverlayPosition({ top: 0, left: 0, width: 0, height: 0 });
       }
     };
 
