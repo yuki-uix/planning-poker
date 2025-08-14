@@ -25,7 +25,7 @@ interface SessionData {
 }
 
 export class RedisSessionStore {
-  private redis: Redis;
+  public redis: Redis;
   private readonly SESSION_PREFIX = 'session:';
   private readonly CONNECTION_PREFIX = 'connections:';
   private readonly USER_CONNECTION_KEY = 'user_connections';
