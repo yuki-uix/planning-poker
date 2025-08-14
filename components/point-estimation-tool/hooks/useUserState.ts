@@ -3,10 +3,13 @@ import { UserRole } from "../../../lib/session-store";
 import {
   getUserData,
   clearAllData,
-  updateUserVote,
   migrateFromOldStorage,
 } from "../../../lib/persistence";
-import { getSessionData, castVote } from "../../../app/actions";
+import { 
+  restoreUserAuthentication,
+  clearAuthentication,
+  verifyUserSession
+} from "../../../app/actions";
 
 export interface UserState {
   currentUser: string;
@@ -37,82 +40,89 @@ export function useUserState(): UserState & UserStateHandlers {
   const [selectedVote, setSelectedVote] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(true);
   const [isJoined, setIsJoined] = useState(false);
+  const [hasRestoredOnce, setHasRestoredOnce] = useState(false);
 
   const restoreUserState = async () => {
+    if (hasRestoredOnce) {
+      return;
+    }
     setIsRestoring(true);
     try {
-      await migrateFromOldStorage();
+      // First try to restore from server-side authentication
+      const authResult = await restoreUserAuthentication();
+      if (authResult.success && authResult.userId && authResult.sessionId) {
+        setCurrentUser(authResult.userId);
+        setUserName(authResult.userName || "");
+        setSessionId(authResult.sessionId);
+        setSelectedRole(authResult.role || "attendance");
+        setIsJoined(true);
+        return;
+      }
+
+      // Fallback to client-side storage  
+      try {
+        await migrateFromOldStorage();
+      } catch (migrationError) {
+        console.error("Migration failed:", migrationError);
+      }
       const storedUserData = await getUserData();
       if (storedUserData) {
-        setCurrentUser(storedUserData.userId);
-        setUserName(storedUserData.userName);
-        setSessionId(storedUserData.sessionId);
-        setSelectedRole(storedUserData.role);
-        if (storedUserData.lastVote !== undefined) {
-          setSelectedVote(storedUserData.lastVote);
-        }
+        // Verify server-side session still exists
         try {
-          const result = await getSessionData(storedUserData.sessionId);
-          if (result.success && result.session) {
-            const userExists = result.session.users.find(
-              (u) => u.id === storedUserData.userId
-            );
-            if (userExists) {
-              if (!userExists.hasVoted && storedUserData.lastVote) {
-                try {
-                  const voteResult = await castVote(
-                    storedUserData.sessionId,
-                    storedUserData.userId,
-                    storedUserData.lastVote
-                  );
-                  if (voteResult.success && voteResult.session) {
-                    // Session will be updated by parent component
-                  }
-                } catch (error) {
-                  console.error(error);
-                  setSelectedVote(null);
-                  await updateUserVote(null);
-                }
-              }
-              return;
+          const verification = await verifyUserSession(
+            storedUserData.userId,
+            storedUserData.sessionId
+          );
+          
+          if (verification.success && 'role' in verification) {
+            setCurrentUser(storedUserData.userId);
+            setUserName(storedUserData.userName);
+            setSessionId(storedUserData.sessionId);
+            setSelectedRole(verification.role || storedUserData.role);
+            
+            if (storedUserData.lastVote !== undefined) {
+              setSelectedVote(storedUserData.lastVote);
             }
+            
+            return;
           }
-        } catch {}
+        } catch (error) {
+          console.error("Failed to verify stored session:", error);
+        }
+        
         clearAllData();
+        await clearAuthentication();
       }
+
+      // Handle URL parameters for new sessions
       const urlParams = new URLSearchParams(window.location.search);
       const sessionFromUrl = urlParams.get("session");
-      if (
-        sessionFromUrl &&
-        (!storedUserData || storedUserData.sessionId !== sessionFromUrl)
-      ) {
+      if (sessionFromUrl) {
         setSessionId(sessionFromUrl);
         setSelectedRole("attendance");
-        if (storedUserData) clearAllData();
-      } else if (
-        sessionFromUrl &&
-        storedUserData &&
-        storedUserData.sessionId === sessionFromUrl
-      ) {
-        setSessionId(sessionFromUrl);
-        setSelectedRole(storedUserData.role);
-      } else if (!sessionFromUrl) {
+      } else {
         setSelectedRole("host");
       }
-    } catch {
+    } catch (error) {
+      console.error("Failed to restore user state:", error);
       clearAllData();
+      await clearAuthentication();
     } finally {
       setIsRestoring(false);
+      setHasRestoredOnce(true);
     }
   };
 
-  const clearUserState = () => {
+  const clearUserState = async () => {
     clearAllData();
+    await clearAuthentication();
     setCurrentUser("");
     setUserName("");
     setSessionId("");
     setSelectedRole("host");
     setSelectedVote(null);
+    setIsJoined(false);
+    setHasRestoredOnce(false); // Allow restoration to run again after clearing
   };
 
   useEffect(() => {
