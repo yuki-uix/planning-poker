@@ -30,10 +30,6 @@ export function useSessionState(
   const [isConnected, setIsConnected] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
-  // 同步isJoined状态
-  useEffect(() => {
-    setIsJoined(isJoined);
-  }, [isJoined, setIsJoined]);
 
   const pollSession = useCallback(async () => {
     console.log("pollSession", { sessionId, currentUser }); // 调试日志

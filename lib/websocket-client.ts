@@ -15,6 +15,7 @@ export interface WebSocketConfig {
   url: string;
   sessionId: string;
   userId: string;
+  authToken?: string;
   reconnectInterval?: number;
   heartbeatInterval?: number;
   maxReconnectAttempts?: number;
@@ -62,7 +63,15 @@ export class WebSocketClient {
       this.isManualClose = false;
 
       try {
-        this.ws = new WebSocket(this.config.url);
+        // Build WebSocket URL with authentication parameters
+        const url = new URL(this.config.url);
+        url.searchParams.set('sessionId', this.config.sessionId);
+        url.searchParams.set('userId', this.config.userId);
+        if (this.config.authToken) {
+          url.searchParams.set('authToken', this.config.authToken);
+        }
+        
+        this.ws = new WebSocket(url.toString());
 
         this.ws.onopen = () => {
           console.log('WebSocket connected');
