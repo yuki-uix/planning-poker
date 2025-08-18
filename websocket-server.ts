@@ -3,7 +3,6 @@ import { createServer } from "http";
 import { redisSessionStore } from "./lib/redis-session-store";
 import { connectionPool } from "./lib/connection-pool";
 import { heartbeatManager } from "./lib/heartbeat-manager";
-import { authStore } from "./lib/auth-store";
 
 const PORT = process.env.PORT || 3001;
 
@@ -52,46 +51,9 @@ wss.on("connection", async (ws: WebSocket, request) => {
   const url = new URL(request.url!, `http://${request.headers.host}`);
   const sessionId = url.searchParams.get("sessionId");
   const userId = url.searchParams.get("userId");
-  const authToken = url.searchParams.get("authToken");
 
   if (!sessionId || !userId) {
     ws.close(1008, "Missing sessionId or userId");
-    return;
-  }
-
-  // Verify authentication
-  try {
-    let authSession = null;
-    if (authToken) {
-      authSession = await authStore.getAuthSession(authToken);
-    } else {
-      // Try to get from cookie (if available in request headers)
-      const cookieHeader = request.headers.cookie;
-      if (cookieHeader) {
-        const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-          const [name, value] = cookie.trim().split('=');
-          acc[name] = value;
-          return acc;
-        }, {} as Record<string, string>);
-        
-        const cookieToken = cookies['planning_poker_auth'];
-        if (cookieToken) {
-          authSession = await authStore.getAuthSession(cookieToken);
-        }
-      }
-    }
-
-    // Verify user permission for the session
-    const verification = await authStore.verifyUserPermission(userId, sessionId);
-    if (!verification.valid) {
-      ws.close(1008, "Invalid user authentication or session permission");
-      return;
-    }
-
-    console.log(`Authenticated WebSocket connection for user ${userId} in session ${sessionId} with role ${verification.role}`);
-  } catch (error) {
-    console.error("WebSocket authentication failed:", error);
-    ws.close(1008, "Authentication failed");
     return;
   }
 
