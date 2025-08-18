@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { UserRole } from "../../../lib/session-store";
 import {
   getUserData,
   clearAllData,
   updateUserVote,
+  updateUserJoinedState,
   migrateFromOldStorage,
 } from "../../../lib/persistence";
 import { getSessionData, castVote } from "../../../app/actions";
@@ -27,6 +28,7 @@ export interface UserStateHandlers {
   setIsJoined: (joined: boolean) => void;
   restoreUserState: () => Promise<void>;
   clearUserState: () => void;
+  updateJoinedState: (joined: boolean) => Promise<void>;
 }
 
 export function useUserState(): UserState & UserStateHandlers {
@@ -58,6 +60,11 @@ export function useUserState(): UserState & UserStateHandlers {
               (u) => u.id === storedUserData.userId
             );
             if (userExists) {
+              // Restore isJoined state if it was persisted
+              if (storedUserData.isJoined) {
+                setIsJoined(true);
+              }
+              
               if (!userExists.hasVoted && storedUserData.lastVote) {
                 try {
                   const voteResult = await castVote(
@@ -106,6 +113,11 @@ export function useUserState(): UserState & UserStateHandlers {
     }
   };
 
+  const updateJoinedState = useCallback(async (joined: boolean) => {
+    setIsJoined(joined);
+    await updateUserJoinedState(joined);
+  }, []);
+
   const clearUserState = () => {
     clearAllData();
     setCurrentUser("");
@@ -113,6 +125,7 @@ export function useUserState(): UserState & UserStateHandlers {
     setSessionId("");
     setSelectedRole("host");
     setSelectedVote(null);
+    setIsJoined(false);
   };
 
   useEffect(() => {
@@ -135,5 +148,6 @@ export function useUserState(): UserState & UserStateHandlers {
     setSessionId, // 新增导出
     restoreUserState,
     clearUserState,
+    updateJoinedState,
   };
 }

@@ -38,6 +38,8 @@ export function useSessionActions(): SessionActions {
           sessionId: result.sessionId,
           role: "host",
           lastVote: null,
+          isJoined: true,
+          joinedAt: Date.now(),
           lastSessionState: {
             revealed: result.session.revealed,
             template: result.session.template,
@@ -72,6 +74,8 @@ export function useSessionActions(): SessionActions {
           sessionId,
           role: selectedRole,
           lastVote: null,
+          isJoined: true,
+          joinedAt: Date.now(),
           lastSessionState: {
             revealed: result.session.revealed,
             template: result.session.template,

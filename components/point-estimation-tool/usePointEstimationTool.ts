@@ -62,7 +62,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
         if (userData) {
           userState.setSessionId(userData.sessionId);
         }
-        userState.setIsJoined(true);
+        await userState.updateJoinedState(true);
         sessionState.setIsConnected(true);
       } else {
         sessionState.setIsConnected(false);
@@ -93,7 +93,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
       if (result) {
         userState.setCurrentUser(userId);
         userState.setSessionId(userState.sessionId);
-        userState.setIsJoined(true);
+        await userState.updateJoinedState(true);
         sessionState.setIsConnected(true);
       } else {
         sessionState.setIsConnected(false);
@@ -200,6 +200,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
       userState.currentUser,
       computedValues.isHost
     );
+    await userState.updateJoinedState(false);
     userState.clearUserState();
     sessionState.setSession(null);
     sessionState.setIsJoined(false);
@@ -209,8 +210,9 @@ export function usePointEstimationTool(): PointEstimationToolState &
   }, [userState, sessionState, sessionActions, uiState, computedValues.isHost]);
 
   // 处理返回主机
-  const handleBackToHost = useCallback(() => {
+  const handleBackToHost = useCallback(async () => {
     uiState.setShowSessionErrorModal(false);
+    await userState.updateJoinedState(false);
     userState.clearUserState();
     sessionState.setSession(null);
     sessionState.setIsJoined(false);
