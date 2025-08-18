@@ -5,7 +5,6 @@ import { Session } from '../types/estimation';
 interface UseWebSocketOptions {
   sessionId: string;
   userId: string;
-  authToken?: string;
   onSessionUpdate?: (session: Session) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
@@ -15,7 +14,6 @@ interface UseWebSocketOptions {
 export function useWebSocket({
   sessionId,
   userId,
-  authToken,
   onSessionUpdate,
   onConnect,
   onDisconnect,
@@ -31,13 +29,12 @@ export function useWebSocket({
       wsClientRef.current.disconnect();
     }
 
-    const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/websocket`;
+    const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/websocket?sessionId=${sessionId}&userId=${userId}`;
     
     wsClientRef.current = new WebSocketClient({
       url: wsUrl,
       sessionId,
       userId,
-      authToken,
       reconnectInterval: 3000,
       heartbeatInterval: 30000,
       maxReconnectAttempts: 10
@@ -78,7 +75,7 @@ export function useWebSocket({
           console.log('Received message:', message);
       }
     });
-  }, [sessionId, userId, authToken, onSessionUpdate, onConnect, onDisconnect, onError]);
+  }, [sessionId, userId, onSessionUpdate, onConnect, onDisconnect, onError]);
 
   // 连接WebSocket
   const connect = useCallback(async () => {

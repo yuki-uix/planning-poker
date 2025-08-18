@@ -7,7 +7,7 @@ import { useControlButtons } from "./useControlButtons";
 import type { ControlButtonsProps } from "./types";
 
 export function ControlButtons(props: ControlButtonsProps) {
-  const { t, session, isHost, allUsersVoted, onRevealVotes, onResetVotes } =
+  const { t, session, isHost, onRevealVotes, onResetVotes } =
     useControlButtons(props);
 
   if (!isHost) return null;
@@ -16,7 +16,7 @@ export function ControlButtons(props: ControlButtonsProps) {
     <div className="flex gap-4 justify-center">
       <Button
         onClick={onRevealVotes}
-        disabled={!allUsersVoted || session.revealed}
+        disabled={session.revealed}
         className="flex items-center gap-2"
         data-guidance-reveal
       >

@@ -41,7 +41,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
   // 更新URL
   useEffect(() => {
     uiState.updateURL(userState.sessionId, sessionState.isJoined);
-  }, [userState.sessionId, sessionState.isJoined, uiState.updateURL]);
+  }, [userState.sessionId, sessionState.isJoined, uiState]);
 
   // 处理创建会话
   const handleCreateSession = useCallback(async () => {
@@ -62,7 +62,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
         if (userData) {
           userState.setSessionId(userData.sessionId);
         }
-        userState.setIsJoined(true);
+        await userState.updateJoinedState(true);
         sessionState.setIsConnected(true);
       } else {
         sessionState.setIsConnected(false);
@@ -74,12 +74,8 @@ export function usePointEstimationTool(): PointEstimationToolState &
     }
   }, [
     userState.userName,
-    sessionState.setIsLoading,
-    sessionState.setIsConnected,
-    sessionActions.handleCreateSession,
-    userState.setCurrentUser,
-    userState.setSessionId,
-    userState.setIsJoined,
+    sessionState,
+    sessionActions,
   ]);
 
   // 处理加入会话
@@ -97,7 +93,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
       if (result) {
         userState.setCurrentUser(userId);
         userState.setSessionId(userState.sessionId);
-        userState.setIsJoined(true);
+        await userState.updateJoinedState(true);
         sessionState.setIsConnected(true);
       } else {
         sessionState.setIsConnected(false);
@@ -113,13 +109,9 @@ export function usePointEstimationTool(): PointEstimationToolState &
     userState.userName,
     userState.sessionId,
     userState.selectedRole,
-    sessionState.setIsLoading,
-    sessionState.setIsConnected,
-    sessionActions.handleJoinSession,
-    userState.setCurrentUser,
-    userState.setSessionId,
-    userState.setIsJoined,
-    uiState.setShowSessionErrorModal,
+    sessionState,
+    sessionActions,
+    uiState,
   ]);
 
   // 处理投票
@@ -140,14 +132,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
         computedValues.canVote
       );
     },
-    [
-      sessionState.session,
-      userState.currentUser,
-      userState.sessionId,
-      userState.setSelectedVote,
-      sessionActions.handleCastVote,
-      computedValues.canVote
-    ]
+    [sessionState.session, userState, sessionActions, computedValues.canVote]
   );
 
   // 处理显示投票
@@ -159,13 +144,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
       sessionState.session,
       computedValues.isHost
     );
-  }, [
-    sessionState.session,
-    userState.sessionId,
-    userState.currentUser,
-    sessionActions.handleRevealVotes,
-    computedValues.isHost
-  ]);
+  }, [sessionState.session, userState, sessionActions, computedValues.isHost]);
 
   // 处理重置投票
   const handleResetVotes = useCallback(async () => {
@@ -178,15 +157,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
       userState.setSelectedVote,
       sessionState.pollSession
     );
-  }, [
-    sessionState.session,
-    userState.sessionId,
-    userState.currentUser,
-    userState.setSelectedVote,
-    sessionActions.handleResetVotes,
-    computedValues.isHost,
-    sessionState.pollSession
-  ]);
+  }, [sessionState.session, userState, sessionActions, computedValues.isHost, sessionState.pollSession]);
 
   // 处理模板变更
   const handleTemplateChange = useCallback(
@@ -202,15 +173,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
         sessionState.pollSession
       );
     },
-    [
-      sessionState.session,
-      userState.sessionId,
-      userState.currentUser,
-      userState.setSelectedVote,
-      sessionActions.handleTemplateChange,
-      computedValues.isHost,
-      sessionState.pollSession
-    ]
+    [sessionState.session, userState, sessionActions, computedValues.isHost, sessionState.pollSession]
   );
 
   // 处理自定义卡片变更
@@ -227,15 +190,7 @@ export function usePointEstimationTool(): PointEstimationToolState &
         sessionState.pollSession
       );
     },
-    [
-      sessionState.session,
-      userState.sessionId,
-      userState.currentUser,
-      userState.setSelectedVote,
-      sessionActions.handleCustomCardsChange,
-      computedValues.isHost,
-      sessionState.pollSession
-    ]
+    [sessionState.session, userState, sessionActions, computedValues.isHost, sessionState.pollSession]
   );
 
   // 处理登出
@@ -245,41 +200,25 @@ export function usePointEstimationTool(): PointEstimationToolState &
       userState.currentUser,
       computedValues.isHost
     );
+    await userState.updateJoinedState(false);
     userState.clearUserState();
     sessionState.setSession(null);
     sessionState.setIsJoined(false);
     sessionState.setIsConnected(true);
     sessionState.setIsLoading(false);
     uiState.clearURL();
-  }, [
-    userState.sessionId,
-    userState.currentUser,
-    userState.clearUserState,
-    sessionState.setSession,
-    sessionState.setIsJoined,
-    sessionState.setIsConnected,
-    sessionState.setIsLoading,
-    sessionActions.handleLogout,
-    uiState.clearURL,
-    computedValues.isHost
-  ]);
+  }, [userState, sessionState, sessionActions, uiState, computedValues.isHost]);
 
   // 处理返回主机
-  const handleBackToHost = useCallback(() => {
+  const handleBackToHost = useCallback(async () => {
     uiState.setShowSessionErrorModal(false);
+    await userState.updateJoinedState(false);
     userState.clearUserState();
     sessionState.setSession(null);
     sessionState.setIsJoined(false);
     sessionState.setIsConnected(true);
     uiState.clearURL();
-  }, [
-    userState.clearUserState,
-    sessionState.setSession,
-    sessionState.setIsJoined,
-    sessionState.setIsConnected,
-    uiState.setShowSessionErrorModal,
-    uiState.clearURL
-  ]);
+  }, [userState, sessionState, uiState]);
 
   const resultObj = {
     currentUser: userState.currentUser,

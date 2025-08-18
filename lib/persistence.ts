@@ -8,6 +8,8 @@ export interface PersistentData {
   role: "host" | "attendance" | "guest";
   timestamp: number;
   lastVote?: string | null;
+  isJoined?: boolean;
+  joinedAt?: number;
   lastSessionState?: {
     revealed: boolean;
     template: {
@@ -221,6 +223,24 @@ export async function updateUserVote(vote: string | null): Promise<void> {
     });
   } catch (error) {
     console.error("Failed to update user vote:", error);
+  }
+}
+
+// 更新用户会话状态
+export async function updateUserJoinedState(isJoined: boolean): Promise<void> {
+  if (!isLocalStorageAvailable()) return;
+
+  try {
+    const currentData = await getUserData();
+    if (!currentData) return;
+
+    await saveUserData({
+      ...currentData,
+      isJoined,
+      joinedAt: isJoined ? Date.now() : currentData.joinedAt,
+    });
+  } catch (error) {
+    console.error("Failed to update user joined state:", error);
   }
 }
 
